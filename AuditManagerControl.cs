@@ -16,7 +16,7 @@ namespace DataverseAuditManager.XrmToolBox
         private readonly DataGridView _tableGrid = new DataGridView();
         private readonly DataGridView _columnGrid = new DataGridView();
         private readonly ToolStripButton _applyButton = new ToolStripButton("Apply && Publish");
-        private readonly ToolStripButton _revertButton = new ToolStripButton("Revert");
+        private readonly ToolStripButton _revertButton = new ToolStripButton("Revert all");
         private readonly ToolStripButton _reviewChangesButton = new ToolStripButton("Review changes");
         private readonly TextBox _tableSearchBox = new TextBox();
         private readonly CheckBox _auditedTablesOnlyCheckBox = new CheckBox();
@@ -525,7 +525,11 @@ namespace DataverseAuditManager.XrmToolBox
 
             using (var dialog = new AuditReviewForm(_snapshot.Tables))
             {
-                if (dialog.ShowDialog(this) == DialogResult.OK)
+                var result = dialog.ShowDialog(this);
+                ApplyTableFilter();
+                UpdatePendingState();
+
+                if (result == DialogResult.OK)
                     ExecuteMethod(() => ApplyChanges(true));
             }
         }
@@ -538,9 +542,10 @@ namespace DataverseAuditManager.XrmToolBox
             if (MessageBox.Show(
                     this,
                     "Discard all pending audit changes?",
-                    "Revert changes",
+                    "Revert all changes",
                     MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question) != DialogResult.Yes)
+                    MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
             {
                 return;
             }

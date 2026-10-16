@@ -12,6 +12,11 @@ namespace DataverseAuditManager.XrmToolBox
         private readonly DataGridView _changesGrid = new DataGridView();
         private readonly ComboBox _scopeFilter = new ComboBox();
         private readonly ComboBox _directionFilter = new ComboBox();
+        private readonly Label _summaryLabel = new Label();
+        private readonly Panel _warningPanel = new Panel();
+        private readonly Label _warningLabel = new Label();
+        private readonly Button _applyButton = new Button();
+        private readonly Button _revertAllButton = new Button();
 
         public AuditReviewForm(IEnumerable<AuditTableItem> tables)
         {
@@ -27,7 +32,7 @@ namespace DataverseAuditManager.XrmToolBox
             AutoScaleMode = AutoScaleMode.Font;
 
             var summaryPanel = CreateSummaryPanel();
-            var warningPanel = CreateWarningPanel();
+            ConfigureWarningPanel();
             var filters = CreateFiltersPanel();
             ConfigureChangesGrid();
 
@@ -46,37 +51,32 @@ namespace DataverseAuditManager.XrmToolBox
                 AutoSize = true,
                 DialogResult = DialogResult.Cancel
             };
-            var applyButton = new Button
-            {
-                Text = "Apply && Publish",
-                AutoSize = true,
-                DialogResult = DialogResult.OK,
-                Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold)
-            };
+
+            _applyButton.Text = "Apply && Publish";
+            _applyButton.AutoSize = true;
+            _applyButton.Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold);
+            _applyButton.Click += (_, __) => ConfirmApply();
+
+            _revertAllButton.Text = "Revert all";
+            _revertAllButton.AutoSize = true;
+            _revertAllButton.Click += (_, __) => ConfirmRevertAll();
 
             footer.Controls.Add(closeButton);
-            footer.Controls.Add(applyButton);
+            footer.Controls.Add(_applyButton);
+            footer.Controls.Add(_revertAllButton);
             Controls.Add(_changesGrid);
             Controls.Add(filters);
-            if (warningPanel != null)
-                Controls.Add(warningPanel);
+            Controls.Add(_warningPanel);
             Controls.Add(summaryPanel);
             Controls.Add(footer);
 
-            AcceptButton = applyButton;
+            AcceptButton = _applyButton;
             CancelButton = closeButton;
-            PopulateChangesGrid();
+            RefreshReview();
         }
 
         private Control CreateSummaryPanel()
         {
-            var tableChanges = _changedTables.Count(table => table.IsChanged);
-            var fieldChanges = _changedTables.Sum(table => table.Columns.Count(column => column.IsChanged));
-            var total = tableChanges + fieldChanges;
-            var enabling = _changedTables.Sum(table => (table.IsChanged && table.Enabled ? 1 : 0) +
-                table.Columns.Count(column => column.IsChanged && column.Enabled));
-            var disabling = total - enabling;
-
             var panel = new Panel
             {
                 Dock = DockStyle.Top,
@@ -84,44 +84,25 @@ namespace DataverseAuditManager.XrmToolBox
                 BackColor = Color.FromArgb(240, 245, 249),
                 Padding = new Padding(12, 8, 12, 6)
             };
-            panel.Controls.Add(new Label
-            {
-                Dock = DockStyle.Fill,
-                Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Text = $"{total} pending change(s)  |  {enabling} enabling  |  {disabling} disabling  |  " +
-                       $"{tableChanges} table(s)  |  {fieldChanges} field(s)  |  Nothing has been applied yet."
-            });
+            _summaryLabel.Dock = DockStyle.Fill;
+            _summaryLabel.Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold);
+            _summaryLabel.TextAlign = ContentAlignment.MiddleLeft;
+            panel.Controls.Add(_summaryLabel);
             return panel;
         }
 
-        private Control CreateWarningPanel()
+        private void ConfigureWarningPanel()
         {
-            var warnings = _changedTables
-                .Where(table => !table.Enabled && table.Columns.Any(column => column.Enabled))
-                .Select(table =>
-                    $"{DisplayName(table.DisplayName, table.LogicalName)} ({table.Columns.Count(column => column.Enabled)})")
-                .ToList();
+            _warningPanel.Dock = DockStyle.Top;
+            _warningPanel.Height = 44;
+            _warningPanel.BackColor = Color.FromArgb(255, 244, 206);
+            _warningPanel.Padding = new Padding(12, 7, 12, 7);
 
-            if (warnings.Count == 0)
-                return null;
-
-            var panel = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 44,
-                BackColor = Color.FromArgb(255, 244, 206),
-                Padding = new Padding(12, 7, 12, 7)
-            };
-            panel.Controls.Add(new Label
-            {
-                Dock = DockStyle.Fill,
-                AutoEllipsis = true,
-                TextAlign = ContentAlignment.MiddleLeft,
-                ForeColor = Color.FromArgb(102, 60, 0),
-                Text = "Warning: enabled field settings will be inactive for disabled tables: " + string.Join(", ", warnings) + "."
-            });
-            return panel;
+            _warningLabel.Dock = DockStyle.Fill;
+            _warningLabel.AutoEllipsis = true;
+            _warningLabel.TextAlign = ContentAlignment.MiddleLeft;
+            _warningLabel.ForeColor = Color.FromArgb(102, 60, 0);
+            _warningPanel.Controls.Add(_warningLabel);
         }
 
         private Control CreateFiltersPanel()
@@ -183,12 +164,21 @@ namespace DataverseAuditManager.XrmToolBox
             _changesGrid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
             _changesGrid.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(248, 250, 252);
             _changesGrid.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.Black;
+            _changesGrid.CellContentClick += ChangesGrid_CellContentClick;
 
-            _changesGrid.Columns.Add(CreateTextColumn("Table", 220, DataGridViewAutoSizeColumnMode.Fill));
-            _changesGrid.Columns.Add(CreateTextColumn("Setting", 240, DataGridViewAutoSizeColumnMode.Fill));
-            _changesGrid.Columns.Add(CreateTextColumn("Logical name", 190));
-            _changesGrid.Columns.Add(CreateTextColumn("Scope", 70));
-            _changesGrid.Columns.Add(CreateTextColumn("Action", 95));
+            _changesGrid.Columns.Add(CreateTextColumn("Table", 210, DataGridViewAutoSizeColumnMode.Fill));
+            _changesGrid.Columns.Add(CreateTextColumn("Setting", 225, DataGridViewAutoSizeColumnMode.Fill));
+            _changesGrid.Columns.Add(CreateTextColumn("Logical name", 175));
+            _changesGrid.Columns.Add(CreateTextColumn("Scope", 65));
+            _changesGrid.Columns.Add(CreateTextColumn("Action", 85));
+            _changesGrid.Columns.Add(new DataGridViewButtonColumn
+            {
+                HeaderText = string.Empty,
+                Text = "Revert",
+                UseColumnTextForButtonValue = true,
+                Width = 74,
+                SortMode = DataGridViewColumnSortMode.NotSortable
+            });
         }
 
         private static DataGridViewTextBoxColumn CreateTextColumn(
@@ -205,6 +195,36 @@ namespace DataverseAuditManager.XrmToolBox
             };
         }
 
+        private void RefreshReview()
+        {
+            var tableChanges = _changedTables.Count(table => table.IsChanged);
+            var fieldChanges = _changedTables.Sum(table => table.Columns.Count(column => column.IsChanged));
+            var total = tableChanges + fieldChanges;
+            var enabling = _changedTables.Sum(table => (table.IsChanged && table.Enabled ? 1 : 0) +
+                table.Columns.Count(column => column.IsChanged && column.Enabled));
+            var disabling = total - enabling;
+
+            _summaryLabel.Text = $"{total} pending change(s)  |  {enabling} enabling  |  {disabling} disabling  |  " +
+                                 $"{tableChanges} table(s)  |  {fieldChanges} field(s)  |  Nothing has been applied yet.";
+            _applyButton.Enabled = total > 0;
+            _revertAllButton.Enabled = total > 0;
+
+            var warnings = _changedTables
+                .Where(table =>
+                    (table.IsChanged || table.Columns.Any(column => column.IsChanged)) &&
+                    !table.Enabled &&
+                    table.Columns.Any(column => column.Enabled))
+                .Select(table =>
+                    $"{DisplayName(table.DisplayName, table.LogicalName)} ({table.Columns.Count(column => column.Enabled)})")
+                .ToList();
+            _warningPanel.Visible = warnings.Count > 0;
+            _warningLabel.Text = warnings.Count == 0
+                ? string.Empty
+                : "Warning: enabled field settings will be inactive for disabled tables: " + string.Join(", ", warnings) + ".";
+
+            PopulateChangesGrid();
+        }
+
         private void PopulateChangesGrid()
         {
             _changesGrid.Rows.Clear();
@@ -216,8 +236,10 @@ namespace DataverseAuditManager.XrmToolBox
                     change.SettingName,
                     change.LogicalName,
                     change.Scope,
-                    change.Enabled ? "Enable" : "Disable");
+                    change.Enabled ? "Enable" : "Disable",
+                    "Revert");
                 var row = _changesGrid.Rows[rowIndex];
+                row.Tag = change;
                 row.Cells[0].ToolTipText = change.TableLogicalName;
                 StyleChangeRow(row, change.Enabled);
             }
@@ -234,6 +256,7 @@ namespace DataverseAuditManager.XrmToolBox
                 {
                     yield return new AuditChangeItem
                     {
+                        Table = table,
                         TableName = tableName,
                         TableLogicalName = table.LogicalName,
                         SettingName = "Table auditing",
@@ -247,6 +270,8 @@ namespace DataverseAuditManager.XrmToolBox
                 {
                     yield return new AuditChangeItem
                     {
+                        Table = table,
+                        Column = column,
                         TableName = tableName,
                         TableLogicalName = table.LogicalName,
                         SettingName = DisplayName(column.DisplayName, column.LogicalName),
@@ -269,6 +294,62 @@ namespace DataverseAuditManager.XrmToolBox
             if (_directionFilter.SelectedIndex == 2 && change.Enabled)
                 return false;
             return true;
+        }
+
+        private void ChangesGrid_CellContentClick(object sender, DataGridViewCellEventArgs eventArgs)
+        {
+            if (eventArgs.RowIndex < 0 || eventArgs.ColumnIndex != 5)
+                return;
+
+            if (_changesGrid.Rows[eventArgs.RowIndex].Tag is AuditChangeItem change)
+            {
+                change.Revert();
+                RefreshReview();
+            }
+        }
+
+        private void ConfirmApply()
+        {
+            var tableChanges = _changedTables.Count(table => table.IsChanged);
+            var fieldChanges = _changedTables.Sum(table => table.Columns.Count(column => column.IsChanged));
+            if (tableChanges + fieldChanges == 0)
+                return;
+
+            if (MessageBox.Show(
+                    this,
+                    $"Apply {tableChanges} table change(s) and {fieldChanges} field change(s)?\n\n" +
+                    "The affected tables will be published after the updates complete.",
+                    "Apply audit configuration",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            {
+                return;
+            }
+
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+
+        private void ConfirmRevertAll()
+        {
+            if (MessageBox.Show(
+                    this,
+                    "Discard all pending audit changes?",
+                    "Revert all changes",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            {
+                return;
+            }
+
+            foreach (var table in _changedTables)
+                table.Revert();
+
+            RefreshReview();
+            DialogResult = DialogResult.Abort;
+            Close();
         }
 
         private static void StyleChangeRow(DataGridViewRow row, bool enabling)
@@ -295,11 +376,21 @@ namespace DataverseAuditManager.XrmToolBox
 
     internal sealed class AuditChangeItem
     {
+        public AuditTableItem Table { get; set; }
+        public AuditColumnItem Column { get; set; }
         public string TableName { get; set; }
         public string TableLogicalName { get; set; }
         public string SettingName { get; set; }
         public string LogicalName { get; set; }
         public string Scope { get; set; }
         public bool Enabled { get; set; }
+
+        public void Revert()
+        {
+            if (Column == null)
+                Table.Enabled = Table.OriginalEnabled;
+            else
+                Column.Enabled = Column.OriginalEnabled;
+        }
     }
 }
