@@ -10,6 +10,8 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Searchable column grid with an audited-only filter and column-level audit toggles
 - Enable or disable all visible, changeable tables or columns
 - Stages changes locally until **Apply & Publish** is selected
+- Reviews pending changes in a compact, filterable list with clear enable or disable actions
+- Allows reviewed changes to be applied and published directly from the review dialog
 - Requires confirmation before writing
 - Publishes only affected tables, once, after applying changes
 - Prevents editing settings whose managed property cannot be changed

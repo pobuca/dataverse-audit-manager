@@ -17,6 +17,7 @@ namespace DataverseAuditManager.XrmToolBox
         private readonly DataGridView _columnGrid = new DataGridView();
         private readonly ToolStripButton _applyButton = new ToolStripButton("Apply && Publish");
         private readonly ToolStripButton _revertButton = new ToolStripButton("Revert");
+        private readonly ToolStripButton _reviewChangesButton = new ToolStripButton("Review changes");
         private readonly TextBox _tableSearchBox = new TextBox();
         private readonly CheckBox _auditedTablesOnlyCheckBox = new CheckBox();
         private readonly TextBox _columnSearchBox = new TextBox();
@@ -64,6 +65,9 @@ namespace DataverseAuditManager.XrmToolBox
             _revertButton.Enabled = false;
             _revertButton.Click += (_, __) => RevertChanges();
 
+            _reviewChangesButton.Enabled = false;
+            _reviewChangesButton.Click += (_, __) => ReviewChanges();
+
             var exportButton = new ToolStripButton("Export JSON");
             exportButton.Click += (_, __) => ExportConfiguration();
 
@@ -75,6 +79,7 @@ namespace DataverseAuditManager.XrmToolBox
             toolStrip.Items.Add(new ToolStripSeparator());
             toolStrip.Items.Add(_applyButton);
             toolStrip.Items.Add(_revertButton);
+            toolStrip.Items.Add(_reviewChangesButton);
             toolStrip.Items.Add(new ToolStripSeparator());
             toolStrip.Items.Add(exportButton);
             toolStrip.Items.Add(closeButton);
@@ -505,6 +510,26 @@ namespace DataverseAuditManager.XrmToolBox
             UpdatePendingState();
         }
 
+        private void ReviewChanges()
+        {
+            _tableGrid.EndEdit();
+            _columnGrid.EndEdit();
+            _tableSource.EndEdit();
+            _columnSource.EndEdit();
+
+            if (_snapshot == null || PendingChanges == 0)
+            {
+                MessageBox.Show(this, "There are no pending audit changes.", "Review changes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var dialog = new AuditReviewForm(_snapshot.Tables))
+            {
+                if (dialog.ShowDialog(this) == DialogResult.OK)
+                    ExecuteMethod(() => ApplyChanges(true));
+            }
+        }
+
         private void RevertChanges()
         {
             if (_snapshot == null || PendingChanges == 0)
@@ -529,6 +554,11 @@ namespace DataverseAuditManager.XrmToolBox
 
         private void ApplyChanges()
         {
+            ApplyChanges(false);
+        }
+
+        private void ApplyChanges(bool reviewed)
+        {
             _tableGrid.EndEdit();
             _columnGrid.EndEdit();
             _tableSource.EndEdit();
@@ -543,7 +573,7 @@ namespace DataverseAuditManager.XrmToolBox
                 $"Apply {tableChanges} table change(s) and {columnChanges} column change(s)?\n\n" +
                 "The affected tables will be published after the updates complete.";
 
-            if (MessageBox.Show(
+            if (!reviewed && MessageBox.Show(
                     this,
                     confirmation,
                     "Apply audit configuration",
@@ -633,6 +663,7 @@ namespace DataverseAuditManager.XrmToolBox
             var pending = PendingChanges;
             _applyButton.Enabled = pending > 0;
             _revertButton.Enabled = pending > 0;
+            _reviewChangesButton.Enabled = pending > 0;
             _statusLabel.Text = _snapshot == null
                 ? "Ready"
                 : $"{_snapshot.Tables.Count} tables loaded | {pending} pending change(s)";
