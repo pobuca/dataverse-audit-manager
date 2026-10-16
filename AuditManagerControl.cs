@@ -17,9 +17,10 @@ namespace DataverseAuditManager.XrmToolBox
         private readonly DataGridView _columnGrid = new DataGridView();
         private readonly ToolStripButton _applyButton = new ToolStripButton("Apply && Publish");
         private readonly ToolStripButton _revertButton = new ToolStripButton("Revert");
-        private readonly ToolStripButton _auditedOnlyButton = new ToolStripButton("Audited only");
         private readonly TextBox _tableSearchBox = new TextBox();
+        private readonly CheckBox _auditedTablesOnlyCheckBox = new CheckBox();
         private readonly TextBox _columnSearchBox = new TextBox();
+        private readonly CheckBox _auditedColumnsOnlyCheckBox = new CheckBox();
         private readonly Label _environmentLabel = new Label();
         private readonly ToolStripStatusLabel _statusLabel = new ToolStripStatusLabel();
         private readonly Button _enableAllTablesButton = new Button();
@@ -70,17 +71,12 @@ namespace DataverseAuditManager.XrmToolBox
             closeButton.Alignment = ToolStripItemAlignment.Right;
             closeButton.Click += (_, __) => CloseTool();
 
-            _auditedOnlyButton.CheckOnClick = true;
-            _auditedOnlyButton.CheckedChanged += (_, __) => ApplyTableFilter();
-
             toolStrip.Items.Add(refreshButton);
             toolStrip.Items.Add(new ToolStripSeparator());
             toolStrip.Items.Add(_applyButton);
             toolStrip.Items.Add(_revertButton);
             toolStrip.Items.Add(new ToolStripSeparator());
             toolStrip.Items.Add(exportButton);
-            toolStrip.Items.Add(new ToolStripSeparator());
-            toolStrip.Items.Add(_auditedOnlyButton);
             toolStrip.Items.Add(closeButton);
 
             var summaryPanel = new Panel
@@ -111,92 +107,72 @@ namespace DataverseAuditManager.XrmToolBox
                     split.SplitterDistance = (int)(availableWidth * 0.42);
             };
 
-            var tableActions = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 38,
-                Padding = new Padding(8, 5, 8, 4)
-            };
+            var tableActions = CreateActionsPanel();
             var tableSearchLabel = new Label
             {
                 AutoSize = true,
                 Text = "Table search:",
-                Location = new Point(8, 10)
+                Anchor = AnchorStyles.Left
             };
-            _tableSearchBox.Location = new Point(92, 7);
-            _tableSearchBox.Width = 190;
-            _tableSearchBox.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            _tableSearchBox.Dock = DockStyle.Fill;
             _tableSearchBox.TextChanged += (_, __) => ApplyTableFilter();
 
-            _disableAllTablesButton.Text = "Disable all";
-            _disableAllTablesButton.AutoSize = true;
-            _disableAllTablesButton.Enabled = false;
-            _disableAllTablesButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _disableAllTablesButton.Location = new Point(tableActions.Width - 92, 5);
-            _disableAllTablesButton.Click += (_, __) => SetAllVisibleTables(false);
+            _auditedTablesOnlyCheckBox.Text = "Audited only";
+            _auditedTablesOnlyCheckBox.AutoSize = true;
+            _auditedTablesOnlyCheckBox.Anchor = AnchorStyles.Left;
+            _auditedTablesOnlyCheckBox.CheckedChanged += (_, __) => ApplyTableFilter();
 
             _enableAllTablesButton.Text = "Enable all";
             _enableAllTablesButton.AutoSize = true;
             _enableAllTablesButton.Enabled = false;
-            _enableAllTablesButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _enableAllTablesButton.Location = new Point(tableActions.Width - 180, 5);
             _enableAllTablesButton.Click += (_, __) => SetAllVisibleTables(true);
 
-            tableActions.Resize += (_, __) =>
-            {
-                _disableAllTablesButton.Left = tableActions.ClientSize.Width - _disableAllTablesButton.Width - 8;
-                _enableAllTablesButton.Left = _disableAllTablesButton.Left - _enableAllTablesButton.Width - 6;
-            };
-            tableActions.Controls.Add(tableSearchLabel);
-            tableActions.Controls.Add(_tableSearchBox);
-            tableActions.Controls.Add(_enableAllTablesButton);
-            tableActions.Controls.Add(_disableAllTablesButton);
+            _disableAllTablesButton.Text = "Disable all";
+            _disableAllTablesButton.AutoSize = true;
+            _disableAllTablesButton.Enabled = false;
+            _disableAllTablesButton.Click += (_, __) => SetAllVisibleTables(false);
+
+            tableActions.Controls.Add(tableSearchLabel, 0, 0);
+            tableActions.Controls.Add(_tableSearchBox, 1, 0);
+            tableActions.Controls.Add(_auditedTablesOnlyCheckBox, 2, 0);
+            tableActions.Controls.Add(_enableAllTablesButton, 3, 0);
+            tableActions.Controls.Add(_disableAllTablesButton, 4, 0);
 
             var tableTitle = CreateSectionTitle("Tables");
             split.Panel1.Controls.Add(_tableGrid);
             split.Panel1.Controls.Add(tableActions);
             split.Panel1.Controls.Add(tableTitle);
 
-            var columnActions = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 38,
-                Padding = new Padding(8, 5, 8, 4)
-            };
+            var columnActions = CreateActionsPanel();
             var columnSearchLabel = new Label
             {
                 AutoSize = true,
                 Text = "Field search:",
-                Location = new Point(8, 10)
+                Anchor = AnchorStyles.Left
             };
-            _columnSearchBox.Location = new Point(88, 7);
-            _columnSearchBox.Width = 190;
-            _columnSearchBox.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            _columnSearchBox.Dock = DockStyle.Fill;
             _columnSearchBox.TextChanged += (_, __) => ApplyColumnFilter();
 
-            _disableAllColumnsButton.Text = "Disable all";
-            _disableAllColumnsButton.AutoSize = true;
-            _disableAllColumnsButton.Enabled = false;
-            _disableAllColumnsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _disableAllColumnsButton.Location = new Point(columnActions.Width - 92, 5);
-            _disableAllColumnsButton.Click += (_, __) => SetAllVisibleColumns(false);
+            _auditedColumnsOnlyCheckBox.Text = "Audited only";
+            _auditedColumnsOnlyCheckBox.AutoSize = true;
+            _auditedColumnsOnlyCheckBox.Anchor = AnchorStyles.Left;
+            _auditedColumnsOnlyCheckBox.CheckedChanged += (_, __) => ApplyColumnFilter();
 
             _enableAllColumnsButton.Text = "Enable all";
             _enableAllColumnsButton.AutoSize = true;
             _enableAllColumnsButton.Enabled = false;
-            _enableAllColumnsButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _enableAllColumnsButton.Location = new Point(columnActions.Width - 180, 5);
             _enableAllColumnsButton.Click += (_, __) => SetAllVisibleColumns(true);
 
-            columnActions.Resize += (_, __) =>
-            {
-                _disableAllColumnsButton.Left = columnActions.ClientSize.Width - _disableAllColumnsButton.Width - 8;
-                _enableAllColumnsButton.Left = _disableAllColumnsButton.Left - _enableAllColumnsButton.Width - 6;
-            };
-            columnActions.Controls.Add(columnSearchLabel);
-            columnActions.Controls.Add(_columnSearchBox);
-            columnActions.Controls.Add(_enableAllColumnsButton);
-            columnActions.Controls.Add(_disableAllColumnsButton);
+            _disableAllColumnsButton.Text = "Disable all";
+            _disableAllColumnsButton.AutoSize = true;
+            _disableAllColumnsButton.Enabled = false;
+            _disableAllColumnsButton.Click += (_, __) => SetAllVisibleColumns(false);
+
+            columnActions.Controls.Add(columnSearchLabel, 0, 0);
+            columnActions.Controls.Add(_columnSearchBox, 1, 0);
+            columnActions.Controls.Add(_auditedColumnsOnlyCheckBox, 2, 0);
+            columnActions.Controls.Add(_enableAllColumnsButton, 3, 0);
+            columnActions.Controls.Add(_disableAllColumnsButton, 4, 0);
 
             var columnTitle = CreateSectionTitle("Columns for selected table");
             split.Panel2.Controls.Add(_columnGrid);
@@ -212,6 +188,26 @@ namespace DataverseAuditManager.XrmToolBox
             Controls.Add(toolStrip);
             Controls.Add(statusStrip);
             ResumeLayout();
+        }
+
+        private static TableLayoutPanel CreateActionsPanel()
+        {
+            var panel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 38,
+                Padding = new Padding(8, 4, 8, 4),
+                ColumnCount = 5,
+                RowCount = 1,
+                GrowStyle = TableLayoutPanelGrowStyle.FixedSize
+            };
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            return panel;
         }
 
         private static Label CreateSectionTitle(string text)
@@ -278,7 +274,7 @@ namespace DataverseAuditManager.XrmToolBox
             _tableGrid.SelectionChanged += (_, __) => ApplyColumnFilter();
             _tableGrid.CurrentCellDirtyStateChanged += (_, __) => CommitDirtyCell(_tableGrid);
             _tableGrid.CellBeginEdit += TableGrid_CellBeginEdit;
-            _tableGrid.CellValueChanged += (_, __) => OnGridValueChanged();
+            _tableGrid.CellValueChanged += (_, __) => OnTableGridValueChanged();
             _tableGrid.CellFormatting += TableGrid_CellFormatting;
         }
 
@@ -331,7 +327,7 @@ namespace DataverseAuditManager.XrmToolBox
 
             _columnGrid.CurrentCellDirtyStateChanged += (_, __) => CommitDirtyCell(_columnGrid);
             _columnGrid.CellBeginEdit += ColumnGrid_CellBeginEdit;
-            _columnGrid.CellValueChanged += (_, __) => OnGridValueChanged();
+            _columnGrid.CellValueChanged += (_, __) => OnColumnGridValueChanged();
             _columnGrid.CellFormatting += ColumnGrid_CellFormatting;
         }
 
@@ -416,7 +412,7 @@ namespace DataverseAuditManager.XrmToolBox
                     Contains(table.DisplayName, search));
             }
 
-            if (_auditedOnlyButton.Checked)
+            if (_auditedTablesOnlyCheckBox.Checked)
                 tables = tables.Where(table => table.Enabled);
 
             _binding = true;
@@ -456,12 +452,16 @@ namespace DataverseAuditManager.XrmToolBox
                     Contains(column.Type, search));
             }
 
+            if (_auditedColumnsOnlyCheckBox.Checked)
+                columns = columns.Where(column => column.Enabled);
+
             _binding = true;
             try
             {
-                _columnSource.DataSource = columns.ToList();
-                _enableAllColumnsButton.Enabled = table.Columns.Any(column => column.CanBeChanged);
-                _disableAllColumnsButton.Enabled = _enableAllColumnsButton.Enabled;
+                var visibleColumns = columns.ToList();
+                _columnSource.DataSource = visibleColumns;
+                _enableAllColumnsButton.Enabled = visibleColumns.Any(column => column.CanBeChanged && !column.Enabled);
+                _disableAllColumnsButton.Enabled = visibleColumns.Any(column => column.CanBeChanged && column.Enabled);
             }
             finally
             {
@@ -500,7 +500,7 @@ namespace DataverseAuditManager.XrmToolBox
             foreach (var column in columns)
                 column.Enabled = enabled;
 
-            _columnSource.ResetBindings(false);
+            ApplyColumnFilter();
             _tableSource.ResetBindings(false);
             UpdatePendingState();
         }
@@ -640,15 +640,26 @@ namespace DataverseAuditManager.XrmToolBox
             _columnGrid.Invalidate();
         }
 
-        private void OnGridValueChanged()
+        private void OnTableGridValueChanged()
         {
             if (_binding)
                 return;
 
             _tableSource.EndEdit();
             _columnSource.EndEdit();
+            ApplyTableFilter();
+            UpdatePendingState();
+        }
+
+        private void OnColumnGridValueChanged()
+        {
+            if (_binding)
+                return;
+
+            _tableSource.EndEdit();
+            _columnSource.EndEdit();
+            ApplyColumnFilter();
             _tableSource.ResetBindings(false);
-            _columnSource.ResetBindings(false);
             UpdatePendingState();
         }
 
