@@ -843,6 +843,20 @@ namespace DataverseAuditManager.XrmToolBox
                     foreach (var table in _snapshot.Tables)
                         table.AcceptChanges();
 
+                    foreach (var issue in result.VerificationIssues)
+                    {
+                        if (issue.Column == null)
+                        {
+                            issue.Table.Enabled = issue.ActualEnabled;
+                            issue.Table.OriginalEnabled = issue.ActualEnabled;
+                        }
+                        else
+                        {
+                            issue.Column.Enabled = issue.ActualEnabled;
+                            issue.Column.OriginalEnabled = issue.ActualEnabled;
+                        }
+                    }
+
                     UpdateTableBulkActionState();
                     UpdateColumnBulkActionState();
                     UpdatePendingState();
@@ -850,21 +864,42 @@ namespace DataverseAuditManager.XrmToolBox
                     var alreadyCurrent = result.AlreadyCurrentTables + result.AlreadyCurrentColumns;
                     var summary =
                         $"Updated {result.UpdatedTables} table setting(s) and " +
-                        $"{result.UpdatedColumns} column setting(s).\n" +
+                        $"{result.UpdatedColumns} field setting(s).\n" +
                         $"Published {result.PublishedTables} affected table(s).";
                     if (alreadyCurrent > 0)
                     {
                         summary +=
                             $"\nSkipped {result.AlreadyCurrentTables} table setting(s) and " +
-                            $"{result.AlreadyCurrentColumns} column setting(s) that were already current.";
+                            $"{result.AlreadyCurrentColumns} field setting(s) that were already current.";
+                    }
+
+                    if (result.VerificationIssues.Count > 0)
+                    {
+                        var details = result.VerificationIssues
+                            .Take(8)
+                            .Select(issue =>
+                                $"• {issue.LogicalName}: requested " +
+                                $"{(issue.RequestedEnabled ? "Enabled" : "Disabled")}, effective " +
+                                $"{(issue.ActualEnabled ? "Enabled" : "Disabled")}")
+                            .ToList();
+                        if (result.VerificationIssues.Count > details.Count)
+                            details.Add($"• ...and {result.VerificationIssues.Count - details.Count} more");
+
+                        summary +=
+                            $"\n\nDataverse did not retain {result.VerificationIssues.Count} requested setting(s):\n" +
+                            string.Join("\n", details);
                     }
 
                     MessageBox.Show(
                         this,
                         summary,
-                        "Audit configuration updated",
+                        result.VerificationIssues.Count == 0
+                            ? "Audit configuration updated"
+                            : "Audit configuration verification warning",
                         MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
+                        result.VerificationIssues.Count == 0
+                            ? MessageBoxIcon.Information
+                            : MessageBoxIcon.Warning);
                 }
             });
         }
@@ -1093,6 +1128,11 @@ namespace DataverseAuditManager.XrmToolBox
                 eventArgs.Value = table.Pending;
                 eventArgs.FormattingApplied = true;
             }
+            else if (propertyName == "Enabled")
+            {
+                eventArgs.Value = table.Enabled;
+                eventArgs.FormattingApplied = true;
+            }
             else if (propertyName == "AuditedColumns")
             {
                 eventArgs.Value = table.AuditedColumns;
@@ -1113,9 +1153,15 @@ namespace DataverseAuditManager.XrmToolBox
                 return;
             }
 
-            if (_columnGrid.Columns[eventArgs.ColumnIndex].DataPropertyName == "Pending")
+            var propertyName = _columnGrid.Columns[eventArgs.ColumnIndex].DataPropertyName;
+            if (propertyName == "Pending")
             {
                 eventArgs.Value = column.Pending;
+                eventArgs.FormattingApplied = true;
+            }
+            else if (propertyName == "Enabled")
+            {
+                eventArgs.Value = column.Enabled;
                 eventArgs.FormattingApplied = true;
             }
 

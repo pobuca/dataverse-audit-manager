@@ -163,7 +163,84 @@ namespace DataverseAuditManager.XrmToolBox
                 result.PublishedTables = affectedTables.Count;
             }
 
-            reportProgress?.Invoke(100, "Audit settings applied and customizations published.");
+            reportProgress?.Invoke(92, "Verifying effective audit settings after publishing...");
+            try
+            {
+                var verificationRequests = new List<OrganizationRequest>();
+                var verificationDescriptions = new List<string>();
+
+                foreach (var table in changedTables)
+                {
+                    verificationRequests.Add(new RetrieveEntityRequest
+                    {
+                        LogicalName = table.LogicalName,
+                        EntityFilters = EntityFilters.Entity,
+                        RetrieveAsIfPublished = false
+                    });
+                    verificationDescriptions.Add($"verify table '{table.LogicalName}'");
+                }
+
+                foreach (var change in changedColumns)
+                {
+                    verificationRequests.Add(new RetrieveAttributeRequest
+                    {
+                        EntityLogicalName = change.Table.LogicalName,
+                        LogicalName = change.Column.LogicalName,
+                        RetrieveAsIfPublished = false
+                    });
+                    verificationDescriptions.Add(
+                        $"verify field '{change.Table.LogicalName}.{change.Column.LogicalName}'");
+                }
+
+                var verificationResponses = ExecuteBatches(
+                    service,
+                    verificationRequests,
+                    verificationDescriptions);
+                var verificationIndex = 0;
+
+                foreach (var table in changedTables)
+                {
+                    var metadata = ((RetrieveEntityResponse)verificationResponses[verificationIndex++]).EntityMetadata;
+                    var actualEnabled = metadata.IsAuditEnabled?.Value == true;
+                    if (actualEnabled != table.Enabled)
+                    {
+                        result.VerificationIssues.Add(new ApplyVerificationIssue
+                        {
+                            Table = table,
+                            RequestedEnabled = table.Enabled,
+                            ActualEnabled = actualEnabled
+                        });
+                    }
+                }
+
+                foreach (var change in changedColumns)
+                {
+                    var metadata = ((RetrieveAttributeResponse)verificationResponses[verificationIndex++]).AttributeMetadata;
+                    var actualEnabled = metadata.IsAuditEnabled?.Value == true;
+                    if (actualEnabled != change.Column.Enabled)
+                    {
+                        result.VerificationIssues.Add(new ApplyVerificationIssue
+                        {
+                            Table = change.Table,
+                            Column = change.Column,
+                            RequestedEnabled = change.Column.Enabled,
+                            ActualEnabled = actualEnabled
+                        });
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException(
+                    "The changes were submitted and the affected tables were published, but the effective audit settings could not be verified. Refresh the grid before retrying.",
+                    exception);
+            }
+
+            reportProgress?.Invoke(
+                100,
+                result.VerificationIssues.Count == 0
+                    ? "Audit settings applied, published, and verified."
+                    : $"Completed with {result.VerificationIssues.Count} verification warning(s).");
             return result;
         }
 

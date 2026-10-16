@@ -15,7 +15,7 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Reverts individual pending changes or all pending changes from the review dialog
 - Allows reviewed changes to be applied and published directly from the review dialog
 - Requires confirmation before applying or reverting all changes
-- Batches metadata retrievals and updates, skips no-op updates, and publishes affected tables once
+- Batches metadata retrievals and updates, skips no-op updates, publishes affected tables once, and verifies the effective settings afterward
 - Prevents editing settings whose managed property cannot be changed
 - Reverts pending changes
 - Exports the complete effective configuration to JSON, loading any remaining field metadata on demand
@@ -67,7 +67,7 @@ The apply operation uses:
 - `UpdateAttributeRequest` for column auditing
 - `PublishXmlRequest` for affected tables
 
-After a successful publish, the local snapshot is updated without performing a complete metadata reload.
+After publishing, the plugin re-reads every changed table and field from the published metadata. Any setting Dataverse did not retain is restored to its effective value in the grid and reported as a verification warning.
 
 If an operation fails partway through, refresh the grid to see the server's effective state before retrying.
 

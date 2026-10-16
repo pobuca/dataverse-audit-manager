@@ -68,6 +68,20 @@ namespace DataverseAuditManager.XrmToolBox
         public int AlreadyCurrentTables { get; set; }
         public int AlreadyCurrentColumns { get; set; }
         public int PublishedTables { get; set; }
+        public List<ApplyVerificationIssue> VerificationIssues { get; set; } =
+            new List<ApplyVerificationIssue>();
+    }
+
+    internal sealed class ApplyVerificationIssue
+    {
+        public AuditTableItem Table { get; set; }
+        public AuditColumnItem Column { get; set; }
+        public bool RequestedEnabled { get; set; }
+        public bool ActualEnabled { get; set; }
+
+        public string LogicalName => Column == null
+            ? Table.LogicalName
+            : $"{Table.LogicalName}.{Column.LogicalName}";
     }
 
     internal sealed class AuditExport
