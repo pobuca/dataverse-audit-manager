@@ -13,8 +13,8 @@ namespace DataverseAuditManager.XrmToolBox
     {
         private readonly BindingSource _tableSource = new BindingSource();
         private readonly BindingSource _columnSource = new BindingSource();
-        private readonly DataGridView _tableGrid = new DataGridView();
-        private readonly DataGridView _columnGrid = new DataGridView();
+        private readonly DataGridView _tableGrid = new SmoothDataGridView();
+        private readonly DataGridView _columnGrid = new SmoothDataGridView();
         private readonly ToolStripButton _applyButton = new ToolStripButton("Apply && Publish");
         private readonly ToolStripButton _revertButton = new ToolStripButton("Revert all");
         private readonly ToolStripButton _reviewChangesButton = new ToolStripButton("Review changes");
@@ -799,8 +799,8 @@ namespace DataverseAuditManager.XrmToolBox
                 return;
 
             var index = _tableSource.List?.IndexOf(table) ?? -1;
-            if (index >= 0)
-                _tableSource.ResetItem(index);
+            if (index >= 0 && index < _tableGrid.RowCount)
+                _tableGrid.InvalidateRow(index);
         }
 
         private void UpdatePendingState()
@@ -821,9 +821,20 @@ namespace DataverseAuditManager.XrmToolBox
             if (_binding)
                 return;
 
+            var table = SelectedTable;
             _tableSource.EndEdit();
             _columnSource.EndEdit();
-            ApplyTableFilter();
+
+            if (_auditedTablesOnlyCheckBox.Checked)
+            {
+                ApplyTableFilter();
+            }
+            else
+            {
+                RefreshTableRow(table);
+                UpdateTableBulkActionState();
+            }
+
             UpdatePendingState();
         }
 
@@ -832,11 +843,46 @@ namespace DataverseAuditManager.XrmToolBox
             if (_binding)
                 return;
 
+            var column = _columnGrid.CurrentRow?.DataBoundItem as AuditColumnItem;
             _tableSource.EndEdit();
             _columnSource.EndEdit();
-            ApplyColumnFilter();
+
+            if (_auditedColumnsOnlyCheckBox.Checked)
+            {
+                ApplyColumnFilter();
+            }
+            else
+            {
+                RefreshColumnRow(column);
+                UpdateColumnBulkActionState();
+            }
+
             RefreshTableRow(SelectedTable);
             UpdatePendingState();
+        }
+
+        private void UpdateTableBulkActionState()
+        {
+            var tables = _tableSource.List.Cast<AuditTableItem>();
+            _enableAllTablesButton.Enabled = tables.Any(table => table.CanBeChanged && !table.Enabled);
+            _disableAllTablesButton.Enabled = tables.Any(table => table.CanBeChanged && table.Enabled);
+        }
+
+        private void UpdateColumnBulkActionState()
+        {
+            var columns = _columnSource.List.Cast<AuditColumnItem>();
+            _enableAllColumnsButton.Enabled = columns.Any(column => column.CanBeChanged && !column.Enabled);
+            _disableAllColumnsButton.Enabled = columns.Any(column => column.CanBeChanged && column.Enabled);
+        }
+
+        private void RefreshColumnRow(AuditColumnItem column)
+        {
+            if (column == null)
+                return;
+
+            var index = _columnSource.List?.IndexOf(column) ?? -1;
+            if (index >= 0 && index < _columnGrid.RowCount)
+                _columnGrid.InvalidateRow(index);
         }
 
         private static void CommitDirtyCell(DataGridView grid)
@@ -871,28 +917,55 @@ namespace DataverseAuditManager.XrmToolBox
 
         private void TableGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs eventArgs)
         {
-            if (!(_tableGrid.Rows[eventArgs.RowIndex].DataBoundItem is AuditTableItem table))
+            if (eventArgs.RowIndex < 0 ||
+                !(_tableGrid.Rows[eventArgs.RowIndex].DataBoundItem is AuditTableItem table))
+            {
                 return;
+            }
 
-            FormatRow(_tableGrid.Rows[eventArgs.RowIndex], table.CanBeChanged, table.IsChanged || table.Columns.Any(column => column.IsChanged));
+            var propertyName = _tableGrid.Columns[eventArgs.ColumnIndex].DataPropertyName;
+            if (propertyName == "Pending")
+            {
+                eventArgs.Value = table.Pending;
+                eventArgs.FormattingApplied = true;
+            }
+            else if (propertyName == "AuditedColumns")
+            {
+                eventArgs.Value = table.AuditedColumns;
+                eventArgs.FormattingApplied = true;
+            }
+
+            FormatCell(
+                eventArgs.CellStyle,
+                table.CanBeChanged,
+                table.IsChanged || table.Columns.Any(column => column.IsChanged));
         }
 
         private void ColumnGrid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs eventArgs)
         {
-            if (!(_columnGrid.Rows[eventArgs.RowIndex].DataBoundItem is AuditColumnItem column))
+            if (eventArgs.RowIndex < 0 ||
+                !(_columnGrid.Rows[eventArgs.RowIndex].DataBoundItem is AuditColumnItem column))
+            {
                 return;
+            }
 
-            FormatRow(_columnGrid.Rows[eventArgs.RowIndex], column.CanBeChanged, column.IsChanged);
+            if (_columnGrid.Columns[eventArgs.ColumnIndex].DataPropertyName == "Pending")
+            {
+                eventArgs.Value = column.Pending;
+                eventArgs.FormattingApplied = true;
+            }
+
+            FormatCell(eventArgs.CellStyle, column.CanBeChanged, column.IsChanged);
         }
 
-        private static void FormatRow(DataGridViewRow row, bool canBeChanged, bool changed)
+        private static void FormatCell(DataGridViewCellStyle style, bool canBeChanged, bool changed)
         {
-            row.DefaultCellStyle.BackColor = changed
+            style.BackColor = changed
                 ? Color.FromArgb(255, 248, 220)
                 : canBeChanged
                     ? Color.White
                     : Color.FromArgb(240, 240, 240);
-            row.DefaultCellStyle.ForeColor = canBeChanged ? Color.Black : Color.DimGray;
+            style.ForeColor = canBeChanged ? Color.Black : Color.DimGray;
         }
 
         private void SelectTable(string logicalName)
