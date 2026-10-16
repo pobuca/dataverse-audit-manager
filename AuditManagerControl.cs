@@ -251,28 +251,36 @@ namespace DataverseAuditManager.XrmToolBox
             {
                 DataPropertyName = "LogicalName",
                 HeaderText = "Logical name",
-                Width = 175,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 32,
+                MinimumWidth = 140,
                 ReadOnly = true
             });
             _tableGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "DisplayName",
                 HeaderText = "Display name",
-                Width = 180,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 32,
+                MinimumWidth = 140,
                 ReadOnly = true
             });
             _tableGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "AuditedColumns",
                 HeaderText = "Audited fields",
-                Width = 95,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 18,
+                MinimumWidth = 95,
                 ReadOnly = true
             });
             _tableGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "Changeable",
                 HeaderText = "Changeable",
-                Width = 85,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 18,
+                MinimumWidth = 85,
                 ReadOnly = true
             });
 
@@ -309,28 +317,36 @@ namespace DataverseAuditManager.XrmToolBox
             {
                 DataPropertyName = "LogicalName",
                 HeaderText = "Logical name",
-                Width = 190,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 32,
+                MinimumWidth = 150,
                 ReadOnly = true
             });
             _columnGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "DisplayName",
                 HeaderText = "Display name",
-                Width = 190,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 32,
+                MinimumWidth = 150,
                 ReadOnly = true
             });
             _columnGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "Type",
                 HeaderText = "Type",
-                Width = 100,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 18,
+                MinimumWidth = 95,
                 ReadOnly = true
             });
             _columnGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "Changeable",
                 HeaderText = "Changeable",
-                Width = 85,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 18,
+                MinimumWidth = 85,
                 ReadOnly = true
             });
 
