@@ -16,7 +16,7 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Allows reviewed changes to be applied and published directly from the review dialog
 - Requires confirmation before applying or reverting all changes
 - Batches metadata retrievals and updates, skips no-op updates, publishes affected tables once, and verifies the effective settings afterward
-- Prevents editing settings whose managed property cannot be changed
+- Prevents editing settings whose managed property cannot be changed and explicitly treats virtual fields as non-auditable
 - Reverts pending changes
 - Exports the complete effective configuration to JSON, loading any remaining field metadata on demand
 - Includes custom 32×32 and 80×80 XrmToolBox branding icons

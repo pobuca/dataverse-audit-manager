@@ -408,6 +408,7 @@ namespace DataverseAuditManager.XrmToolBox
                     "LogicalName",
                     "DisplayName",
                     "AttributeType",
+                    "AttributeTypeName",
                     "IsAuditEnabled");
                 query.AttributeQuery = new AttributeQueryExpression
                 {
@@ -426,17 +427,38 @@ namespace DataverseAuditManager.XrmToolBox
                 .Where(column =>
                     !string.IsNullOrWhiteSpace(column.LogicalName) &&
                     column.IsAuditEnabled != null)
-                .Select(column => new AuditColumnItem
+                .Select(column =>
                 {
-                    LogicalName = column.LogicalName,
-                    DisplayName = GetLabel(column.DisplayName, column.LogicalName),
-                    Type = column.AttributeType?.ToString() ?? "Unknown",
-                    OriginalEnabled = column.IsAuditEnabled.Value,
-                    Enabled = column.IsAuditEnabled.Value,
-                    CanBeChanged = column.IsAuditEnabled.CanBeChanged
+                    var attributeTypeName = column.AttributeTypeName?.Value;
+                    var isVirtual = string.Equals(
+                        attributeTypeName,
+                        "VirtualType",
+                        StringComparison.OrdinalIgnoreCase);
+                    return new AuditColumnItem
+                    {
+                        LogicalName = column.LogicalName,
+                        DisplayName = GetLabel(column.DisplayName, column.LogicalName),
+                        Type = GetAttributeTypeLabel(attributeTypeName, column.AttributeType),
+                        OriginalEnabled = column.IsAuditEnabled.Value,
+                        Enabled = column.IsAuditEnabled.Value,
+                        CanBeChanged = column.IsAuditEnabled.CanBeChanged && !isVirtual,
+                        IsVirtual = isVirtual
+                    };
                 })
                 .OrderBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static string GetAttributeTypeLabel(
+            string attributeTypeName,
+            AttributeTypeCode? legacyAttributeType)
+        {
+            if (string.IsNullOrWhiteSpace(attributeTypeName))
+                return legacyAttributeType?.ToString() ?? "Unknown";
+
+            return attributeTypeName.EndsWith("Type", StringComparison.OrdinalIgnoreCase)
+                ? attributeTypeName.Substring(0, attributeTypeName.Length - 4)
+                : attributeTypeName;
         }
 
         private static int? GetNullableInt32(Entity entity, string attributeName)

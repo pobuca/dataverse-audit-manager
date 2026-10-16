@@ -55,10 +55,13 @@ namespace DataverseAuditManager.XrmToolBox
         public bool OriginalEnabled { get; set; }
         public bool Enabled { get; set; }
         public bool CanBeChanged { get; set; }
+        public bool IsVirtual { get; set; }
 
         public bool IsChanged => OriginalEnabled != Enabled;
         public string Pending => IsChanged ? "●" : "";
-        public string Changeable => CanBeChanged ? "Yes" : "No";
+        public string Changeable => CanBeChanged
+            ? "Yes"
+            : IsVirtual ? "No (virtual)" : "No";
     }
 
     internal sealed class ApplyResult
