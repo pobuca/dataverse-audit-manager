@@ -7,6 +7,7 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Uses the active XrmToolBox connection; no connection string is stored by the plugin
 - Displays environment auditing, retention, and user-access auditing status
 - Searchable table grid with an audited-only filter and table-level audit toggles
+- Loads table metadata first, then retrieves and caches fields only when a table is selected
 - Searchable column grid with an audited-only filter and column-level audit toggles
 - Enable or disable all visible, changeable tables or columns
 - Stages changes locally until **Apply & Publish** is selected
@@ -17,7 +18,7 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Publishes only affected tables, once, after applying changes
 - Prevents editing settings whose managed property cannot be changed
 - Reverts pending changes
-- Exports the complete effective configuration to JSON
+- Exports the complete effective configuration to JSON, loading any remaining field metadata on demand
 - Includes custom 32×32 and 80×80 XrmToolBox branding icons
 
 ## Build

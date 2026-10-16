@@ -276,7 +276,11 @@ namespace DataverseAuditManager.XrmToolBox
                 ReadOnly = true
             });
 
-            _tableGrid.SelectionChanged += (_, __) => ApplyColumnFilter();
+            _tableGrid.SelectionChanged += (_, __) =>
+            {
+                if (!_binding)
+                    LoadSelectedTableColumns();
+            };
             _tableGrid.CurrentCellDirtyStateChanged += (_, __) => CommitDirtyCell(_tableGrid);
             _tableGrid.CellBeginEdit += TableGrid_CellBeginEdit;
             _tableGrid.CellValueChanged += (_, __) => OnTableGridValueChanged();
@@ -357,7 +361,7 @@ namespace DataverseAuditManager.XrmToolBox
         {
             WorkAsync(new WorkAsyncInfo
             {
-                Message = "Reading organization, table, and column audit settings...",
+                Message = "Reading organization and table audit settings...",
                 Work = (_, eventArgs) => eventArgs.Result = DataverseAuditService.Load(Service),
                 PostWorkCallBack = eventArgs =>
                 {
@@ -393,6 +397,8 @@ namespace DataverseAuditManager.XrmToolBox
             {
                 _binding = false;
             }
+
+            LoadSelectedTableColumns();
         }
 
         private void ApplyTableFilter()
@@ -420,6 +426,7 @@ namespace DataverseAuditManager.XrmToolBox
             if (_auditedTablesOnlyCheckBox.Checked)
                 tables = tables.Where(table => table.Enabled);
 
+            var wasBinding = _binding;
             _binding = true;
             try
             {
@@ -432,14 +439,17 @@ namespace DataverseAuditManager.XrmToolBox
             }
             finally
             {
-                _binding = false;
+                _binding = wasBinding;
             }
+
+            if (!wasBinding)
+                LoadSelectedTableColumns();
         }
 
         private void ApplyColumnFilter()
         {
             var table = SelectedTable;
-            if (table == null)
+            if (table == null || !table.ColumnsLoaded)
             {
                 _columnSource.DataSource = null;
                 _enableAllColumnsButton.Enabled = false;
@@ -460,6 +470,7 @@ namespace DataverseAuditManager.XrmToolBox
             if (_auditedColumnsOnlyCheckBox.Checked)
                 columns = columns.Where(column => column.Enabled);
 
+            var wasBinding = _binding;
             _binding = true;
             try
             {
@@ -470,8 +481,69 @@ namespace DataverseAuditManager.XrmToolBox
             }
             finally
             {
-                _binding = false;
+                _binding = wasBinding;
             }
+        }
+
+        private void LoadSelectedTableColumns()
+        {
+            var table = SelectedTable;
+            if (table == null)
+            {
+                ApplyColumnFilter();
+                return;
+            }
+
+            if (table.ColumnsLoaded)
+            {
+                ApplyColumnFilter();
+                return;
+            }
+
+            if (table.ColumnsLoading)
+                return;
+
+            table.ColumnsLoading = true;
+            _columnSource.DataSource = null;
+            _enableAllColumnsButton.Enabled = false;
+            _disableAllColumnsButton.Enabled = false;
+            _tableSource.ResetBindings(false);
+
+            WorkAsync(new WorkAsyncInfo
+            {
+                Message = $"Reading fields for {table.DisplayName} ({table.LogicalName})...",
+                Work = (_, eventArgs) =>
+                    eventArgs.Result = DataverseAuditService.LoadColumns(Service, table.LogicalName),
+                PostWorkCallBack = eventArgs =>
+                {
+                    table.ColumnsLoading = false;
+                    if (eventArgs.Error != null)
+                    {
+                        var wasBinding = _binding;
+                        _binding = true;
+                        try
+                        {
+                            _tableSource.ResetBindings(false);
+                        }
+                        finally
+                        {
+                            _binding = wasBinding;
+                        }
+
+                        ShowErrorDialog(eventArgs.Error, $"Load fields for {table.LogicalName}");
+                        return;
+                    }
+
+                    table.Columns = (List<AuditColumnItem>)eventArgs.Result;
+                    table.ColumnsLoaded = true;
+                    _tableSource.ResetBindings(false);
+
+                    if (string.Equals(SelectedTable?.LogicalName, table.LogicalName, StringComparison.OrdinalIgnoreCase))
+                        ApplyColumnFilter();
+
+                    UpdatePendingState();
+                }
+            });
         }
 
         private static bool Contains(string value, string search)
@@ -625,6 +697,7 @@ namespace DataverseAuditManager.XrmToolBox
                 return;
             }
 
+            string fileName;
             using (var dialog = new SaveFileDialog
             {
                 Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
@@ -636,31 +709,72 @@ namespace DataverseAuditManager.XrmToolBox
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
-                var export = new AuditExport
-                {
-                    ExportedAtUtc = DateTimeOffset.UtcNow,
-                    OrganizationName = _snapshot.OrganizationName,
-                    EnvironmentAuditingEnabled = _snapshot.EnvironmentAuditingEnabled,
-                    Tables = _snapshot.Tables.Select(table => new AuditExportTable
-                    {
-                        LogicalName = table.LogicalName,
-                        DisplayName = table.DisplayName,
-                        Enabled = table.Enabled,
-                        CanBeChanged = table.CanBeChanged,
-                        Columns = table.Columns.Select(column => new AuditExportColumn
-                        {
-                            LogicalName = column.LogicalName,
-                            DisplayName = column.DisplayName,
-                            Type = column.Type,
-                            Enabled = column.Enabled,
-                            CanBeChanged = column.CanBeChanged
-                        }).ToList()
-                    }).ToList()
-                };
-
-                File.WriteAllText(dialog.FileName, JsonConvert.SerializeObject(export, Formatting.Indented));
-                _statusLabel.Text = $"Exported configuration to {dialog.FileName}";
+                fileName = dialog.FileName;
             }
+
+            var unloadedTables = _snapshot.Tables.Where(table => !table.ColumnsLoaded).ToList();
+            if (unloadedTables.Count == 0)
+            {
+                WriteExportConfiguration(fileName);
+                return;
+            }
+
+            WorkAsync(new WorkAsyncInfo
+            {
+                Message = "Loading all remaining field metadata for export...",
+                Work = (_, eventArgs) => eventArgs.Result = DataverseAuditService.LoadAllColumns(Service),
+                PostWorkCallBack = eventArgs =>
+                {
+                    if (eventArgs.Error != null)
+                    {
+                        ShowErrorDialog(eventArgs.Error, "Load fields for export");
+                        return;
+                    }
+
+                    var columnsByTable = (Dictionary<string, List<AuditColumnItem>>)eventArgs.Result;
+                    foreach (var table in unloadedTables)
+                    {
+                        if (!columnsByTable.TryGetValue(table.LogicalName, out var columns))
+                            continue;
+
+                        table.Columns = columns;
+                        table.ColumnsLoaded = true;
+                        table.ColumnsLoading = false;
+                    }
+
+                    _tableSource.ResetBindings(false);
+                    ApplyColumnFilter();
+                    WriteExportConfiguration(fileName);
+                }
+            });
+        }
+
+        private void WriteExportConfiguration(string fileName)
+        {
+            var export = new AuditExport
+            {
+                ExportedAtUtc = DateTimeOffset.UtcNow,
+                OrganizationName = _snapshot.OrganizationName,
+                EnvironmentAuditingEnabled = _snapshot.EnvironmentAuditingEnabled,
+                Tables = _snapshot.Tables.Select(table => new AuditExportTable
+                {
+                    LogicalName = table.LogicalName,
+                    DisplayName = table.DisplayName,
+                    Enabled = table.Enabled,
+                    CanBeChanged = table.CanBeChanged,
+                    Columns = table.Columns.Select(column => new AuditExportColumn
+                    {
+                        LogicalName = column.LogicalName,
+                        DisplayName = column.DisplayName,
+                        Type = column.Type,
+                        Enabled = column.Enabled,
+                        CanBeChanged = column.CanBeChanged
+                    }).ToList()
+                }).ToList()
+            };
+
+            File.WriteAllText(fileName, JsonConvert.SerializeObject(export, Formatting.Indented));
+            _statusLabel.Text = $"Exported configuration to {fileName}";
         }
 
         private void UpdatePendingState()

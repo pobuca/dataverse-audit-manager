@@ -19,7 +19,7 @@ namespace DataverseAuditManager.XrmToolBox
                 throw new InvalidOperationException("Connect XrmToolBox to a Dataverse environment first.");
 
             var snapshot = LoadOrganizationSettings(service);
-            snapshot.Tables = LoadAuditMetadata(service);
+            snapshot.Tables = LoadTableMetadata(service);
             return snapshot;
         }
 
@@ -142,65 +142,41 @@ namespace DataverseAuditManager.XrmToolBox
             };
         }
 
-        private static List<AuditTableItem> LoadAuditMetadata(IOrganizationService service)
+        public static List<AuditColumnItem> LoadColumns(IOrganizationService service, string tableLogicalName)
         {
-            var entityProperties = new MetadataPropertiesExpression { AllProperties = false };
-            entityProperties.PropertyNames.AddRange(
-                "LogicalName",
-                "DisplayName",
-                "IsAuditEnabled",
-                "IsPrivate",
-                "Attributes");
+            if (service == null)
+                throw new InvalidOperationException("The Dataverse connection is not available.");
 
-            var attributeProperties = new MetadataPropertiesExpression { AllProperties = false };
-            attributeProperties.PropertyNames.AddRange(
-                "LogicalName",
-                "DisplayName",
-                "AttributeType",
-                "IsAuditEnabled");
+            var metadata = RetrieveAuditMetadata(service, tableLogicalName, includeColumns: true)
+                .SingleOrDefault(table =>
+                    string.Equals(table.LogicalName, tableLogicalName, StringComparison.OrdinalIgnoreCase));
 
-            var entityFilter = new MetadataFilterExpression(LogicalOperator.And);
-            entityFilter.Conditions.Add(
-                new MetadataConditionExpression(
-                    "IsPrivate",
-                    MetadataConditionOperator.Equals,
-                    false));
+            if (metadata == null)
+                throw new InvalidOperationException($"Table metadata was not returned for '{tableLogicalName}'.");
 
-            var response = (RetrieveMetadataChangesResponse)service.Execute(
-                new RetrieveMetadataChangesRequest
-                {
-                    Query = new EntityQueryExpression
-                    {
-                        Criteria = entityFilter,
-                        Properties = entityProperties,
-                        AttributeQuery = new AttributeQueryExpression
-                        {
-                            Properties = attributeProperties
-                        }
-                    }
-                });
+            return MapColumns(metadata);
+        }
 
-            return response.EntityMetadata
+        public static Dictionary<string, List<AuditColumnItem>> LoadAllColumns(IOrganizationService service)
+        {
+            if (service == null)
+                throw new InvalidOperationException("The Dataverse connection is not available.");
+
+            return RetrieveAuditMetadata(service, null, includeColumns: true)
+                .Where(table => !string.IsNullOrWhiteSpace(table.LogicalName))
+                .ToDictionary(
+                    table => table.LogicalName,
+                    MapColumns,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static List<AuditTableItem> LoadTableMetadata(IOrganizationService service)
+        {
+            return RetrieveAuditMetadata(service, null, includeColumns: false)
                 .Where(table => !string.IsNullOrWhiteSpace(table.LogicalName))
                 .Select(table =>
                 {
                     var tableEnabled = table.IsAuditEnabled?.Value == true;
-                    var columns = (table.Attributes ?? Array.Empty<AttributeMetadata>())
-                        .Where(column =>
-                            !string.IsNullOrWhiteSpace(column.LogicalName) &&
-                            column.IsAuditEnabled != null)
-                        .Select(column => new AuditColumnItem
-                        {
-                            LogicalName = column.LogicalName,
-                            DisplayName = GetLabel(column.DisplayName, column.LogicalName),
-                            Type = column.AttributeType?.ToString() ?? "Unknown",
-                            OriginalEnabled = column.IsAuditEnabled.Value,
-                            Enabled = column.IsAuditEnabled.Value,
-                            CanBeChanged = column.IsAuditEnabled.CanBeChanged
-                        })
-                        .OrderBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-
                     return new AuditTableItem
                     {
                         LogicalName = table.LogicalName,
@@ -208,10 +184,81 @@ namespace DataverseAuditManager.XrmToolBox
                         OriginalEnabled = tableEnabled,
                         Enabled = tableEnabled,
                         CanBeChanged = table.IsAuditEnabled?.CanBeChanged == true,
-                        Columns = columns
+                        ColumnsLoaded = false
                     };
                 })
                 .OrderBy(table => table.LogicalName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static IEnumerable<EntityMetadata> RetrieveAuditMetadata(
+            IOrganizationService service,
+            string tableLogicalName,
+            bool includeColumns)
+        {
+            var entityProperties = new MetadataPropertiesExpression { AllProperties = false };
+            entityProperties.PropertyNames.AddRange(
+                "LogicalName",
+                "DisplayName",
+                "IsAuditEnabled",
+                "IsPrivate");
+            if (includeColumns)
+                entityProperties.PropertyNames.Add("Attributes");
+
+            var entityFilter = new MetadataFilterExpression(LogicalOperator.And);
+            entityFilter.Conditions.Add(new MetadataConditionExpression(
+                "IsPrivate",
+                MetadataConditionOperator.Equals,
+                false));
+            if (!string.IsNullOrWhiteSpace(tableLogicalName))
+            {
+                entityFilter.Conditions.Add(new MetadataConditionExpression(
+                    "LogicalName",
+                    MetadataConditionOperator.Equals,
+                    tableLogicalName));
+            }
+
+            var query = new EntityQueryExpression
+            {
+                Criteria = entityFilter,
+                Properties = entityProperties
+            };
+
+            if (includeColumns)
+            {
+                var attributeProperties = new MetadataPropertiesExpression { AllProperties = false };
+                attributeProperties.PropertyNames.AddRange(
+                    "LogicalName",
+                    "DisplayName",
+                    "AttributeType",
+                    "IsAuditEnabled");
+                query.AttributeQuery = new AttributeQueryExpression
+                {
+                    Properties = attributeProperties
+                };
+            }
+
+            var response = (RetrieveMetadataChangesResponse)service.Execute(
+                new RetrieveMetadataChangesRequest { Query = query });
+            return response.EntityMetadata;
+        }
+
+        private static List<AuditColumnItem> MapColumns(EntityMetadata table)
+        {
+            return (table.Attributes ?? Array.Empty<AttributeMetadata>())
+                .Where(column =>
+                    !string.IsNullOrWhiteSpace(column.LogicalName) &&
+                    column.IsAuditEnabled != null)
+                .Select(column => new AuditColumnItem
+                {
+                    LogicalName = column.LogicalName,
+                    DisplayName = GetLabel(column.DisplayName, column.LogicalName),
+                    Type = column.AttributeType?.ToString() ?? "Unknown",
+                    OriginalEnabled = column.IsAuditEnabled.Value,
+                    Enabled = column.IsAuditEnabled.Value,
+                    CanBeChanged = column.IsAuditEnabled.CanBeChanged
+                })
+                .OrderBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 

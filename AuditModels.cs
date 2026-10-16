@@ -20,12 +20,16 @@ namespace DataverseAuditManager.XrmToolBox
         public bool OriginalEnabled { get; set; }
         public bool Enabled { get; set; }
         public bool CanBeChanged { get; set; }
+        public bool ColumnsLoaded { get; set; }
+        public bool ColumnsLoading { get; set; }
         public List<AuditColumnItem> Columns { get; set; } = new List<AuditColumnItem>();
 
         public bool IsChanged => OriginalEnabled != Enabled;
         public string Pending => IsChanged || Columns.Any(column => column.IsChanged) ? "●" : "";
         public string Changeable => CanBeChanged ? "Yes" : "No";
-        public string AuditedColumns => $"{Columns.Count(column => column.Enabled)} / {Columns.Count}";
+        public string AuditedColumns => ColumnsLoaded
+            ? $"{Columns.Count(column => column.Enabled)} / {Columns.Count}"
+            : ColumnsLoading ? "Loading..." : "On selection";
         public int PendingChangeCount => (IsChanged ? 1 : 0) + Columns.Count(column => column.IsChanged);
 
         public void Revert()
