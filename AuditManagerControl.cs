@@ -507,7 +507,7 @@ namespace DataverseAuditManager.XrmToolBox
             _columnSource.DataSource = null;
             _enableAllColumnsButton.Enabled = false;
             _disableAllColumnsButton.Enabled = false;
-            _tableSource.ResetBindings(false);
+            RefreshTableRow(table);
 
             WorkAsync(new WorkAsyncInfo
             {
@@ -523,7 +523,7 @@ namespace DataverseAuditManager.XrmToolBox
                         _binding = true;
                         try
                         {
-                            _tableSource.ResetBindings(false);
+                            RefreshTableRow(table);
                         }
                         finally
                         {
@@ -536,7 +536,7 @@ namespace DataverseAuditManager.XrmToolBox
 
                     table.Columns = (List<AuditColumnItem>)eventArgs.Result;
                     table.ColumnsLoaded = true;
-                    _tableSource.ResetBindings(false);
+                    RefreshTableRow(table);
 
                     if (string.Equals(SelectedTable?.LogicalName, table.LogicalName, StringComparison.OrdinalIgnoreCase))
                         ApplyColumnFilter();
@@ -578,7 +578,7 @@ namespace DataverseAuditManager.XrmToolBox
                 column.Enabled = enabled;
 
             ApplyColumnFilter();
-            _tableSource.ResetBindings(false);
+            RefreshTableRow(SelectedTable);
             UpdatePendingState();
         }
 
@@ -777,6 +777,16 @@ namespace DataverseAuditManager.XrmToolBox
             _statusLabel.Text = $"Exported configuration to {fileName}";
         }
 
+        private void RefreshTableRow(AuditTableItem table)
+        {
+            if (table == null)
+                return;
+
+            var index = _tableSource.List?.IndexOf(table) ?? -1;
+            if (index >= 0)
+                _tableSource.ResetItem(index);
+        }
+
         private void UpdatePendingState()
         {
             var pending = PendingChanges;
@@ -809,7 +819,7 @@ namespace DataverseAuditManager.XrmToolBox
             _tableSource.EndEdit();
             _columnSource.EndEdit();
             ApplyColumnFilter();
-            _tableSource.ResetBindings(false);
+            RefreshTableRow(SelectedTable);
             UpdatePendingState();
         }
 
