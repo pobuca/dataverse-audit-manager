@@ -31,6 +31,10 @@ namespace DataverseAuditManager.XrmToolBox
 
         private AuditSnapshot _snapshot;
         private bool _binding;
+        private string _tableSortProperty;
+        private SortOrder _tableSortOrder = SortOrder.None;
+        private string _columnSortProperty;
+        private SortOrder _columnSortOrder = SortOrder.None;
 
         public AuditManagerControl()
         {
@@ -284,6 +288,10 @@ namespace DataverseAuditManager.XrmToolBox
                 ReadOnly = true
             });
 
+            foreach (DataGridViewColumn column in _tableGrid.Columns)
+                column.SortMode = DataGridViewColumnSortMode.Programmatic;
+
+            _tableGrid.ColumnHeaderMouseClick += TableGrid_ColumnHeaderMouseClick;
             _tableGrid.SelectionChanged += (_, __) =>
             {
                 if (!_binding)
@@ -350,6 +358,10 @@ namespace DataverseAuditManager.XrmToolBox
                 ReadOnly = true
             });
 
+            foreach (DataGridViewColumn column in _columnGrid.Columns)
+                column.SortMode = DataGridViewColumnSortMode.Programmatic;
+
+            _columnGrid.ColumnHeaderMouseClick += ColumnGrid_ColumnHeaderMouseClick;
             _columnGrid.CurrentCellDirtyStateChanged += (_, __) => CommitDirtyCell(_columnGrid);
             _columnGrid.CellBeginEdit += ColumnGrid_CellBeginEdit;
             _columnGrid.CellValueChanged += (_, __) => OnColumnGridValueChanged();
@@ -446,8 +458,9 @@ namespace DataverseAuditManager.XrmToolBox
             _binding = true;
             try
             {
-                var visibleTables = tables.ToList();
+                var visibleTables = SortTables(tables).ToList();
                 _tableSource.DataSource = visibleTables;
+                UpdateSortGlyph(_tableGrid, _tableSortProperty, _tableSortOrder);
                 _enableAllTablesButton.Enabled = visibleTables.Any(table => table.CanBeChanged && !table.Enabled);
                 _disableAllTablesButton.Enabled = visibleTables.Any(table => table.CanBeChanged && table.Enabled);
                 SelectTable(selectedName);
@@ -490,14 +503,138 @@ namespace DataverseAuditManager.XrmToolBox
             _binding = true;
             try
             {
-                var visibleColumns = columns.ToList();
+                var visibleColumns = SortColumns(columns).ToList();
                 _columnSource.DataSource = visibleColumns;
+                UpdateSortGlyph(_columnGrid, _columnSortProperty, _columnSortOrder);
                 _enableAllColumnsButton.Enabled = visibleColumns.Any(column => column.CanBeChanged && !column.Enabled);
                 _disableAllColumnsButton.Enabled = visibleColumns.Any(column => column.CanBeChanged && column.Enabled);
             }
             finally
             {
                 _binding = wasBinding;
+            }
+        }
+
+        private void TableGrid_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs eventArgs)
+        {
+            if (eventArgs.ColumnIndex < 0)
+                return;
+
+            var propertyName = _tableGrid.Columns[eventArgs.ColumnIndex].DataPropertyName;
+            UpdateSortSelection(ref _tableSortProperty, ref _tableSortOrder, propertyName);
+            ApplyTableFilter();
+        }
+
+        private void ColumnGrid_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs eventArgs)
+        {
+            if (eventArgs.ColumnIndex < 0)
+                return;
+
+            var selectedColumnName =
+                (_columnGrid.CurrentRow?.DataBoundItem as AuditColumnItem)?.LogicalName;
+            var propertyName = _columnGrid.Columns[eventArgs.ColumnIndex].DataPropertyName;
+            UpdateSortSelection(ref _columnSortProperty, ref _columnSortOrder, propertyName);
+            ApplyColumnFilter();
+            SelectColumn(selectedColumnName);
+        }
+
+        private static void UpdateSortSelection(
+            ref string currentProperty,
+            ref SortOrder currentOrder,
+            string selectedProperty)
+        {
+            if (string.Equals(currentProperty, selectedProperty, StringComparison.Ordinal))
+            {
+                currentOrder = currentOrder == SortOrder.Ascending
+                    ? SortOrder.Descending
+                    : SortOrder.Ascending;
+                return;
+            }
+
+            currentProperty = selectedProperty;
+            currentOrder = SortOrder.Ascending;
+        }
+
+        private IEnumerable<AuditTableItem> SortTables(IEnumerable<AuditTableItem> tables)
+        {
+            switch (_tableSortProperty)
+            {
+                case "Pending":
+                    return OrderItems(tables, table => table.PendingChangeCount > 0, _tableSortOrder)
+                        .ThenBy(table => table.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "Enabled":
+                    return OrderItems(tables, table => table.Enabled, _tableSortOrder)
+                        .ThenBy(table => table.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "DisplayName":
+                    return OrderText(tables, table => table.DisplayName, _tableSortOrder)
+                        .ThenBy(table => table.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "AuditedColumns":
+                    return OrderText(tables, table => table.AuditedColumns, _tableSortOrder)
+                        .ThenBy(table => table.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "Changeable":
+                    return OrderItems(tables, table => table.CanBeChanged, _tableSortOrder)
+                        .ThenBy(table => table.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "LogicalName":
+                    return OrderText(tables, table => table.LogicalName, _tableSortOrder);
+                default:
+                    return tables;
+            }
+        }
+
+        private IEnumerable<AuditColumnItem> SortColumns(IEnumerable<AuditColumnItem> columns)
+        {
+            switch (_columnSortProperty)
+            {
+                case "Pending":
+                    return OrderItems(columns, column => column.IsChanged, _columnSortOrder)
+                        .ThenBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "Enabled":
+                    return OrderItems(columns, column => column.Enabled, _columnSortOrder)
+                        .ThenBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "DisplayName":
+                    return OrderText(columns, column => column.DisplayName, _columnSortOrder)
+                        .ThenBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "Type":
+                    return OrderText(columns, column => column.Type, _columnSortOrder)
+                        .ThenBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "Changeable":
+                    return OrderItems(columns, column => column.CanBeChanged, _columnSortOrder)
+                        .ThenBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase);
+                case "LogicalName":
+                    return OrderText(columns, column => column.LogicalName, _columnSortOrder);
+                default:
+                    return columns;
+            }
+        }
+
+        private static IOrderedEnumerable<T> OrderItems<T, TKey>(
+            IEnumerable<T> items,
+            Func<T, TKey> keySelector,
+            SortOrder sortOrder)
+        {
+            return sortOrder == SortOrder.Descending
+                ? items.OrderByDescending(keySelector)
+                : items.OrderBy(keySelector);
+        }
+
+        private static IOrderedEnumerable<T> OrderText<T>(
+            IEnumerable<T> items,
+            Func<T, string> keySelector,
+            SortOrder sortOrder)
+        {
+            return sortOrder == SortOrder.Descending
+                ? items.OrderByDescending(keySelector, StringComparer.OrdinalIgnoreCase)
+                : items.OrderBy(keySelector, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void UpdateSortGlyph(DataGridView grid, string propertyName, SortOrder sortOrder)
+        {
+            foreach (DataGridViewColumn column in grid.Columns)
+            {
+                column.HeaderCell.SortGlyphDirection =
+                    string.Equals(column.DataPropertyName, propertyName, StringComparison.Ordinal)
+                        ? sortOrder
+                        : SortOrder.None;
             }
         }
 
@@ -993,6 +1130,23 @@ namespace DataverseAuditManager.XrmToolBox
                     ? Color.White
                     : Color.FromArgb(240, 240, 240);
             style.ForeColor = canBeChanged ? Color.Black : Color.DimGray;
+        }
+
+        private void SelectColumn(string logicalName)
+        {
+            if (string.IsNullOrWhiteSpace(logicalName))
+                return;
+
+            foreach (DataGridViewRow row in _columnGrid.Rows)
+            {
+                if (row.DataBoundItem is AuditColumnItem column &&
+                    string.Equals(column.LogicalName, logicalName, StringComparison.OrdinalIgnoreCase))
+                {
+                    row.Selected = true;
+                    _columnGrid.CurrentCell = row.Cells[0];
+                    return;
+                }
+            }
         }
 
         private void SelectTable(string logicalName)
