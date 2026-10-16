@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>DataverseAuditManager.XrmToolBox</AssemblyName>
+    <RootNamespace>DataverseAuditManager.XrmToolBox</RootNamespace>
+    <Authors>Pobuca</Authors>
+    <Description>Inspect and manage Dataverse table and column auditing from XrmToolBox.</Description>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>1.0.4</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MscrmTools.Xrm.Connection" Version="1.2025.9.64" />
+    <PackageReference Include="XrmToolBoxPackage" Version="1.2025.10.74" />
+  </ItemGroup>
+</Project>
