@@ -38,6 +38,13 @@ namespace DataverseAuditManager.XrmToolBox
             foreach (var column in Columns)
                 column.Enabled = column.OriginalEnabled;
         }
+
+        public void AcceptChanges()
+        {
+            OriginalEnabled = Enabled;
+            foreach (var column in Columns)
+                column.OriginalEnabled = column.Enabled;
+        }
     }
 
     internal sealed class AuditColumnItem
@@ -58,6 +65,8 @@ namespace DataverseAuditManager.XrmToolBox
     {
         public int UpdatedTables { get; set; }
         public int UpdatedColumns { get; set; }
+        public int AlreadyCurrentTables { get; set; }
+        public int AlreadyCurrentColumns { get; set; }
         public int PublishedTables { get; set; }
     }
 

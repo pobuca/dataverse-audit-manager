@@ -679,9 +679,21 @@ namespace DataverseAuditManager.XrmToolBox
 
             WorkAsync(new WorkAsyncInfo
             {
-                Message = "Applying audit settings and publishing affected tables...",
-                Work = (_, eventArgs) =>
-                    eventArgs.Result = DataverseAuditService.Apply(Service, _snapshot.Tables),
+                Message = "Preparing audit configuration changes...",
+                Work = (worker, eventArgs) =>
+                    eventArgs.Result = DataverseAuditService.Apply(
+                        Service,
+                        _snapshot.Tables,
+                        (percentage, message) => worker.ReportProgress(percentage, message)),
+                ProgressChanged = progressEventArgs =>
+                {
+                    var message = progressEventArgs.UserState as string;
+                    if (string.IsNullOrWhiteSpace(message))
+                        return;
+
+                    SetWorkingMessage(message);
+                    _statusLabel.Text = message;
+                },
                 PostWorkCallBack = eventArgs =>
                 {
                     if (eventArgs.Error != null)
@@ -691,16 +703,31 @@ namespace DataverseAuditManager.XrmToolBox
                     }
 
                     var result = (ApplyResult)eventArgs.Result;
-                    MessageBox.Show(
-                        this,
+                    foreach (var table in _snapshot.Tables)
+                        table.AcceptChanges();
+
+                    UpdateTableBulkActionState();
+                    UpdateColumnBulkActionState();
+                    UpdatePendingState();
+
+                    var alreadyCurrent = result.AlreadyCurrentTables + result.AlreadyCurrentColumns;
+                    var summary =
                         $"Updated {result.UpdatedTables} table setting(s) and " +
                         $"{result.UpdatedColumns} column setting(s).\n" +
-                        $"Published {result.PublishedTables} affected table(s).",
+                        $"Published {result.PublishedTables} affected table(s).";
+                    if (alreadyCurrent > 0)
+                    {
+                        summary +=
+                            $"\nSkipped {result.AlreadyCurrentTables} table setting(s) and " +
+                            $"{result.AlreadyCurrentColumns} column setting(s) that were already current.";
+                    }
+
+                    MessageBox.Show(
+                        this,
+                        summary,
                         "Audit configuration updated",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
-
-                    LoadMetadata();
                 }
             });
         }
