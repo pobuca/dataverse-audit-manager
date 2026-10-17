@@ -1,7 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Security;
+using System.Threading;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
@@ -347,6 +350,124 @@ namespace DataverseAuditManager.XrmToolBox
                     StringComparer.OrdinalIgnoreCase);
         }
 
+        public static AuditStorageSnapshot LoadAuditStorageUsage(
+            IOrganizationService service,
+            AuditSnapshot auditSnapshot,
+            Action<int, string> reportProgress = null)
+        {
+            if (service == null)
+                throw new InvalidOperationException("The Dataverse connection is not available.");
+            if (auditSnapshot == null)
+                throw new InvalidOperationException("Load the audit configuration before requesting usage.");
+
+            const int maximumAttempts = 60;
+            const int pollingIntervalMilliseconds = 3000;
+            object actionResult = null;
+
+            for (var attempt = 1; attempt <= maximumAttempts; attempt++)
+            {
+                reportProgress?.Invoke(
+                    Math.Min(90, 5 + attempt * 2),
+                    attempt == 1
+                        ? "Requesting audit storage details from Dataverse..."
+                        : $"Dataverse is calculating audit storage usage (check {attempt}/{maximumAttempts})...");
+
+                var response = service.Execute(new OrganizationRequest("GetAuditStorageDetails"));
+                actionResult = response.Results.Contains("Result")
+                    ? response.Results["Result"]
+                    : null;
+                if (actionResult == null)
+                    throw new InvalidOperationException("Dataverse did not return audit storage details.");
+
+                var status = Convert.ToString(
+                    GetComplexProperty(actionResult, "Status"),
+                    CultureInfo.InvariantCulture);
+                if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase))
+                    break;
+
+                var calculationInProgress =
+                    string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(status, "InProgress", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(status, "Running", StringComparison.OrdinalIgnoreCase);
+                if (!calculationInProgress)
+                {
+                    throw new InvalidOperationException(
+                        $"Dataverse returned an unexpected audit storage status: '{status ?? "Unknown"}'.");
+                }
+
+                if (attempt == maximumAttempts)
+                {
+                    throw new TimeoutException(
+                        "Dataverse is still calculating audit storage usage. Try again in a few minutes.");
+                }
+
+                Thread.Sleep(pollingIntervalMilliseconds);
+            }
+
+            reportProgress?.Invoke(94, "Preparing audit usage by table...");
+            var details = GetComplexProperty(actionResult, "AuditStorageDetails") as IDictionary;
+            if (details == null)
+                throw new InvalidOperationException("Dataverse returned audit storage details in an unsupported format.");
+
+            var knownTables = auditSnapshot.Tables.ToDictionary(
+                table => table.LogicalName,
+                StringComparer.OrdinalIgnoreCase);
+            var usageByTable = new Dictionary<string, AuditStorageItem>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DictionaryEntry entry in details)
+            {
+                var logicalName = Convert.ToString(entry.Key, CultureInfo.InvariantCulture);
+                if (string.IsNullOrWhiteSpace(logicalName) || entry.Value == null)
+                    continue;
+
+                knownTables.TryGetValue(logicalName, out var knownTable);
+                usageByTable[logicalName] = new AuditStorageItem
+                {
+                    LogicalName = logicalName,
+                    DisplayName = knownTable?.DisplayName ?? logicalName,
+                    ObjectTypeCode = GetNullableInt32(
+                        GetComplexProperty(entry.Value, "ObjectTypeCode")),
+                    AuditingEnabled = knownTable?.Enabled,
+                    SizeInBytes = GetInt64(GetComplexProperty(entry.Value, "SizeInBytes"))
+                };
+            }
+
+            foreach (var table in auditSnapshot.Tables)
+            {
+                if (usageByTable.ContainsKey(table.LogicalName))
+                    continue;
+
+                usageByTable[table.LogicalName] = new AuditStorageItem
+                {
+                    LogicalName = table.LogicalName,
+                    DisplayName = table.DisplayName,
+                    AuditingEnabled = table.Enabled,
+                    SizeInBytes = 0
+                };
+            }
+
+            var totalSize = usageByTable.Values.Sum(table => table.SizeInBytes);
+            var orderedTables = usageByTable.Values
+                .OrderByDescending(table => table.SizeInBytes)
+                .ThenBy(table => table.LogicalName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            for (var index = 0; index < orderedTables.Count; index++)
+            {
+                orderedTables[index].Rank = index + 1;
+                orderedTables[index].Percentage = totalSize > 0
+                    ? orderedTables[index].SizeInBytes * 100d / totalSize
+                    : 0;
+            }
+
+            reportProgress?.Invoke(100, "Audit storage usage loaded.");
+            return new AuditStorageSnapshot
+            {
+                OrganizationName = auditSnapshot.OrganizationName,
+                RetrievedAtUtc = DateTimeOffset.UtcNow,
+                Tables = orderedTables
+            };
+        }
+
         private static List<AuditTableItem> LoadTableMetadata(IOrganizationService service)
         {
             return RetrieveAuditMetadata(service, null, includeColumns: false)
@@ -447,6 +568,47 @@ namespace DataverseAuditManager.XrmToolBox
                 })
                 .OrderBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static object GetComplexProperty(object source, string propertyName)
+        {
+            if (source == null)
+                return null;
+
+            if (source is Entity entity && entity.Attributes.Contains(propertyName))
+                return entity.Attributes[propertyName];
+
+            if (source is IDictionary dictionary)
+            {
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    if (string.Equals(
+                            Convert.ToString(entry.Key, CultureInfo.InvariantCulture),
+                            propertyName,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return entry.Value;
+                    }
+                }
+            }
+
+            var property = source.GetType().GetProperty(propertyName);
+            return property?.GetValue(source);
+        }
+
+        private static int? GetNullableInt32(object value)
+        {
+            if (value == null)
+                return null;
+
+            return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+        }
+
+        private static long GetInt64(object value)
+        {
+            return value == null
+                ? 0
+                : Convert.ToInt64(value, CultureInfo.InvariantCulture);
         }
 
         private static string GetAttributeTypeLabel(

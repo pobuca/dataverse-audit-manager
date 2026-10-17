@@ -18,6 +18,7 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Batches metadata retrievals and updates, skips no-op updates, publishes affected tables once, and verifies the effective settings afterward
 - Prevents editing settings whose managed property cannot be changed and explicitly treats virtual fields as non-auditable
 - Reverts pending changes
+- Shows read-only audit storage usage per table using Dataverse `GetAuditStorageDetails`, with search, filters, sorting, percentages, and refresh
 - Exports the complete effective configuration to JSON, loading any remaining field metadata on demand
 - Includes custom 32×32 and 80×80 XrmToolBox branding icons
 
@@ -68,6 +69,8 @@ The apply operation uses:
 - `PublishXmlRequest` for affected tables
 
 After publishing, the plugin re-reads every changed table and field from the published metadata. Any setting Dataverse did not retain is restored to its effective value in the grid and reported as a verification warning.
+
+The **Audit usage** command is read-only. It requests the official per-table audit storage breakdown from Dataverse and may poll while the environment calculates the result.
 
 If an operation fails partway through, refresh the grid to see the server's effective state before retrying.
 

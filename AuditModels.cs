@@ -87,6 +87,29 @@ namespace DataverseAuditManager.XrmToolBox
             : $"{Table.LogicalName}.{Column.LogicalName}";
     }
 
+    internal sealed class AuditStorageSnapshot
+    {
+        public string OrganizationName { get; set; }
+        public DateTimeOffset RetrievedAtUtc { get; set; }
+        public List<AuditStorageItem> Tables { get; set; } = new List<AuditStorageItem>();
+        public long TotalSizeInBytes => Tables.Sum(table => table.SizeInBytes);
+    }
+
+    internal sealed class AuditStorageItem
+    {
+        public int Rank { get; set; }
+        public string LogicalName { get; set; }
+        public string DisplayName { get; set; }
+        public int? ObjectTypeCode { get; set; }
+        public bool? AuditingEnabled { get; set; }
+        public long SizeInBytes { get; set; }
+        public double Percentage { get; set; }
+
+        public string AuditingStatus => AuditingEnabled.HasValue
+            ? AuditingEnabled.Value ? "Enabled" : "Disabled"
+            : "Unknown";
+    }
+
     internal sealed class AuditExport
     {
         public DateTimeOffset ExportedAtUtc { get; set; }

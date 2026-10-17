@@ -72,6 +72,9 @@ namespace DataverseAuditManager.XrmToolBox
             _reviewChangesButton.Enabled = false;
             _reviewChangesButton.Click += (_, __) => ReviewChanges();
 
+            var auditUsageButton = new ToolStripButton("Audit usage");
+            auditUsageButton.Click += (_, __) => ExecuteMethod(LoadAuditUsage);
+
             var exportButton = new ToolStripButton("Export JSON");
             exportButton.Click += (_, __) => ExportConfiguration();
 
@@ -85,6 +88,7 @@ namespace DataverseAuditManager.XrmToolBox
             toolStrip.Items.Add(_revertButton);
             toolStrip.Items.Add(_reviewChangesButton);
             toolStrip.Items.Add(new ToolStripSeparator());
+            toolStrip.Items.Add(auditUsageButton);
             toolStrip.Items.Add(exportButton);
             toolStrip.Items.Add(closeButton);
 
@@ -902,6 +906,75 @@ namespace DataverseAuditManager.XrmToolBox
                             : MessageBoxIcon.Warning);
                 }
             });
+        }
+
+        private void LoadAuditUsage()
+        {
+            if (_snapshot == null)
+            {
+                MessageBox.Show(
+                    this,
+                    "Load audit metadata before requesting usage.",
+                    "Audit usage",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            WorkAsync(new WorkAsyncInfo
+            {
+                Message = "Requesting audit storage usage from Dataverse...",
+                Work = (worker, eventArgs) =>
+                    eventArgs.Result = DataverseAuditService.LoadAuditStorageUsage(
+                        Service,
+                        _snapshot,
+                        (percentage, message) => worker.ReportProgress(percentage, message)),
+                ProgressChanged = progressEventArgs =>
+                {
+                    var message = progressEventArgs.UserState as string;
+                    if (string.IsNullOrWhiteSpace(message))
+                        return;
+
+                    SetWorkingMessage(message);
+                    _statusLabel.Text = message;
+                },
+                PostWorkCallBack = eventArgs =>
+                {
+                    if (eventArgs.Error != null)
+                    {
+                        ShowErrorDialog(eventArgs.Error, "Load audit storage usage");
+                        return;
+                    }
+
+                    var usage = (AuditStorageSnapshot)eventArgs.Result;
+                    _statusLabel.Text =
+                        $"Audit usage loaded: {usage.Tables.Count(table => table.SizeInBytes > 0)} table(s), " +
+                        $"{FormatBytes(usage.TotalSizeInBytes)} total";
+
+                    using (var dialog = new AuditUsageForm(usage))
+                    {
+                        if (dialog.ShowDialog(this) == DialogResult.Retry)
+                            BeginInvoke(new Action(() => ExecuteMethod(LoadAuditUsage)));
+                    }
+                }
+            });
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            string[] units = { "B", "KB", "MB", "GB", "TB" };
+            var value = Math.Max(0, bytes);
+            var displayValue = (double)value;
+            var unitIndex = 0;
+            while (displayValue >= 1024 && unitIndex < units.Length - 1)
+            {
+                displayValue /= 1024;
+                unitIndex++;
+            }
+
+            return unitIndex == 0
+                ? $"{value:N0} {units[unitIndex]}"
+                : $"{displayValue:N2} {units[unitIndex]}";
         }
 
         private void ExportConfiguration()
