@@ -56,29 +56,37 @@ namespace DataverseAuditManager.XrmToolBox
             {
                 GripStyle = ToolStripGripStyle.Hidden,
                 Dock = DockStyle.Top,
+                ImageScalingSize = new Size(18, 18),
                 Padding = new Padding(4, 3, 4, 3)
             };
 
             var refreshButton = new ToolStripButton("Refresh");
+            ConfigureToolbarButton(refreshButton, ToolbarIcons.Refresh);
             refreshButton.Click += (_, __) => ExecuteMethod(LoadMetadata);
 
             _applyButton.Enabled = false;
+            ConfigureToolbarButton(_applyButton, ToolbarIcons.Apply);
             _applyButton.Font = new Font(_applyButton.Font, FontStyle.Bold);
             _applyButton.Click += (_, __) => ExecuteMethod(ApplyChanges);
 
             _revertButton.Enabled = false;
+            ConfigureToolbarButton(_revertButton, ToolbarIcons.Revert);
             _revertButton.Click += (_, __) => RevertChanges();
 
             _reviewChangesButton.Enabled = false;
+            ConfigureToolbarButton(_reviewChangesButton, ToolbarIcons.Review);
             _reviewChangesButton.Click += (_, __) => ReviewChanges();
 
             var auditUsageButton = new ToolStripButton("Audit usage");
+            ConfigureToolbarButton(auditUsageButton, ToolbarIcons.Usage);
             auditUsageButton.Click += (_, __) => ExecuteMethod(LoadAuditUsage);
 
             var exportButton = new ToolStripButton("Export JSON");
+            ConfigureToolbarButton(exportButton, ToolbarIcons.Export);
             exportButton.Click += (_, __) => ExportConfiguration();
 
             var closeButton = new ToolStripButton("Close");
+            ConfigureToolbarButton(closeButton, ToolbarIcons.Close);
             closeButton.Alignment = ToolStripItemAlignment.Right;
             closeButton.Click += (_, __) => CloseTool();
 
@@ -221,6 +229,14 @@ namespace DataverseAuditManager.XrmToolBox
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             return panel;
+        }
+
+        private static void ConfigureToolbarButton(ToolStripButton button, Image image)
+        {
+            button.Image = image;
+            button.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            button.TextImageRelation = TextImageRelation.ImageBeforeText;
+            button.ImageAlign = ContentAlignment.MiddleCenter;
         }
 
         private static Label CreateSectionTitle(string text)
