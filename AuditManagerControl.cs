@@ -144,11 +144,13 @@ namespace DataverseAuditManager.XrmToolBox
             _auditedTablesOnlyCheckBox.CheckedChanged += (_, __) => ApplyTableFilter();
 
             _enableAllTablesButton.Text = "Enable all";
+            ToolbarIcons.Configure(_enableAllTablesButton, ToolbarIcons.Enable);
             _enableAllTablesButton.AutoSize = true;
             _enableAllTablesButton.Enabled = false;
             _enableAllTablesButton.Click += (_, __) => SetAllVisibleTables(true);
 
             _disableAllTablesButton.Text = "Disable all";
+            ToolbarIcons.Configure(_disableAllTablesButton, ToolbarIcons.Disable);
             _disableAllTablesButton.AutoSize = true;
             _disableAllTablesButton.Enabled = false;
             _disableAllTablesButton.Click += (_, __) => SetAllVisibleTables(false);
@@ -180,11 +182,13 @@ namespace DataverseAuditManager.XrmToolBox
             _auditedColumnsOnlyCheckBox.CheckedChanged += (_, __) => ApplyColumnFilter();
 
             _enableAllColumnsButton.Text = "Enable all";
+            ToolbarIcons.Configure(_enableAllColumnsButton, ToolbarIcons.Enable);
             _enableAllColumnsButton.AutoSize = true;
             _enableAllColumnsButton.Enabled = false;
             _enableAllColumnsButton.Click += (_, __) => SetAllVisibleColumns(true);
 
             _disableAllColumnsButton.Text = "Disable all";
+            ToolbarIcons.Configure(_disableAllColumnsButton, ToolbarIcons.Disable);
             _disableAllColumnsButton.AutoSize = true;
             _disableAllColumnsButton.Enabled = false;
             _disableAllColumnsButton.Click += (_, __) => SetAllVisibleColumns(false);

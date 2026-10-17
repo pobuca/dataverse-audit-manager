@@ -168,6 +168,8 @@ namespace DataverseAuditManager.XrmToolBox
                 AutoSize = true,
                 DialogResult = DialogResult.Retry
             };
+            ToolbarIcons.Configure(closeButton, ToolbarIcons.Close);
+            ToolbarIcons.Configure(refreshButton, ToolbarIcons.Refresh);
 
             footer.Controls.Add(closeButton);
             footer.Controls.Add(refreshButton);

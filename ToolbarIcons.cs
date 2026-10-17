@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Windows.Forms;
 
 namespace DataverseAuditManager.XrmToolBox
 {
@@ -14,11 +15,21 @@ namespace DataverseAuditManager.XrmToolBox
 
         public static Image Refresh { get; } = DrawRefresh();
         public static Image Apply { get; } = DrawApply();
+        public static Image Enable { get; } = DrawEnable();
+        public static Image Disable { get; } = DrawDisable();
         public static Image Revert { get; } = DrawRevert();
         public static Image Review { get; } = DrawReview();
         public static Image Usage { get; } = DrawUsage();
         public static Image Export { get; } = DrawExport();
         public static Image Close { get; } = DrawClose();
+
+        public static void Configure(Button button, Image image)
+        {
+            button.Image = new Bitmap(image, new Size(14, 14));
+            button.ImageAlign = ContentAlignment.MiddleLeft;
+            button.TextImageRelation = TextImageRelation.ImageBeforeText;
+            button.Padding = new Padding(4, 0, 4, 0);
+        }
 
         private static Bitmap CreateBitmap(Action<Graphics> draw)
         {
@@ -68,6 +79,31 @@ namespace DataverseAuditManager.XrmToolBox
                         new PointF(14.8f, 6.8f)
                     });
                 }
+            });
+        }
+
+        private static Image DrawEnable()
+        {
+            return CreateBitmap(graphics =>
+            {
+                using (var pen = CreatePen(Teal, 1.8f))
+                    graphics.DrawEllipse(pen, 2.5f, 2.5f, 15, 15);
+                using (var pen = CreatePen(Blue, 2.0f))
+                {
+                    graphics.DrawLine(pen, 10, 6, 10, 14);
+                    graphics.DrawLine(pen, 6, 10, 14, 10);
+                }
+            });
+        }
+
+        private static Image DrawDisable()
+        {
+            return CreateBitmap(graphics =>
+            {
+                using (var pen = CreatePen(Magenta, 1.8f))
+                    graphics.DrawEllipse(pen, 2.5f, 2.5f, 15, 15);
+                using (var pen = CreatePen(Magenta, 2.0f))
+                    graphics.DrawLine(pen, 6, 10, 14, 10);
             });
         }
 

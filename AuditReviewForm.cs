@@ -51,13 +51,16 @@ namespace DataverseAuditManager.XrmToolBox
                 AutoSize = true,
                 DialogResult = DialogResult.Cancel
             };
+            ToolbarIcons.Configure(closeButton, ToolbarIcons.Close);
 
             _applyButton.Text = "Apply && Publish";
+            ToolbarIcons.Configure(_applyButton, ToolbarIcons.Apply);
             _applyButton.AutoSize = true;
             _applyButton.Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold);
             _applyButton.Click += (_, __) => ConfirmApply();
 
             _revertAllButton.Text = "Revert all";
+            ToolbarIcons.Configure(_revertAllButton, ToolbarIcons.Revert);
             _revertAllButton.AutoSize = true;
             _revertAllButton.Click += (_, __) => ConfirmRevertAll();
 
@@ -171,12 +174,13 @@ namespace DataverseAuditManager.XrmToolBox
             _changesGrid.Columns.Add(CreateTextColumn("Logical name", 175));
             _changesGrid.Columns.Add(CreateTextColumn("Scope", 65));
             _changesGrid.Columns.Add(CreateTextColumn("Action", 85));
-            _changesGrid.Columns.Add(new DataGridViewButtonColumn
+            _changesGrid.Columns.Add(new DataGridViewIconButtonColumn
             {
                 HeaderText = string.Empty,
                 Text = "Revert",
+                Icon = ToolbarIcons.Revert,
                 UseColumnTextForButtonValue = true,
-                Width = 74,
+                Width = 82,
                 SortMode = DataGridViewColumnSortMode.NotSortable
             });
         }
