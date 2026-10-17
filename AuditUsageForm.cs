@@ -2,29 +2,39 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using IOrganizationService = Microsoft.Xrm.Sdk.IOrganizationService;
 
 namespace DataverseAuditManager.XrmToolBox
 {
     internal sealed class AuditUsageForm : Form
     {
         private readonly AuditStorageSnapshot _snapshot;
+        private readonly IOrganizationService _service;
         private readonly SmoothDataGridView _grid = new SmoothDataGridView();
         private readonly TextBox _searchBox = new TextBox();
         private readonly CheckBox _withUsageOnlyCheckBox = new CheckBox();
         private readonly CheckBox _auditedOnlyCheckBox = new CheckBox();
         private readonly Label _summaryLabel = new Label();
+        private readonly ComboBox _activityRangeBox = new ComboBox();
+        private readonly Button _fieldActivityButton = new Button();
+        private readonly Button _deleteHistoryButton = new Button();
+        private readonly Button _refreshButton = new Button();
+        private readonly Button _closeButton = new Button();
+        private string _summaryText;
         private string _sortProperty = "SizeInBytes";
         private SortOrder _sortOrder = SortOrder.Descending;
 
-        public AuditUsageForm(AuditStorageSnapshot snapshot)
+        public AuditUsageForm(AuditStorageSnapshot snapshot, IOrganizationService service)
         {
             _snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
+            _service = service ?? throw new ArgumentNullException(nameof(service));
 
             Text = "Audit storage usage by table";
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(1080, 680);
-            MinimumSize = new Size(760, 480);
+            MinimumSize = new Size(900, 480);
             ShowInTaskbar = false;
             AutoScaleMode = AutoScaleMode.Font;
 
@@ -36,6 +46,12 @@ namespace DataverseAuditManager.XrmToolBox
             _searchBox.TextChanged += (_, __) => PopulateGrid();
             _withUsageOnlyCheckBox.CheckedChanged += (_, __) => PopulateGrid();
             _auditedOnlyCheckBox.CheckedChanged += (_, __) => PopulateGrid();
+            _grid.SelectionChanged += (_, __) => UpdateActionState();
+            _grid.CellDoubleClick += (_, eventArgs) =>
+            {
+                if (eventArgs.RowIndex >= 0)
+                    ShowFieldActivity();
+            };
 
             PopulateGrid();
         }
@@ -53,11 +69,12 @@ namespace DataverseAuditManager.XrmToolBox
             _summaryLabel.Dock = DockStyle.Fill;
             _summaryLabel.Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold);
             _summaryLabel.TextAlign = ContentAlignment.MiddleLeft;
-            _summaryLabel.Text =
+            _summaryText =
                 $"{_snapshot.OrganizationName}  |  Total audit storage: " +
                 $"{FormatBytes(_snapshot.TotalSizeInBytes)}  |  " +
                 $"{_snapshot.Tables.Count(table => table.SizeInBytes > 0)} table(s) with usage  |  " +
                 $"Retrieved {_snapshot.RetrievedAtUtc.ToLocalTime():g}";
+            _summaryLabel.Text = _summaryText;
             panel.Controls.Add(_summaryLabel);
             return panel;
         }
@@ -69,7 +86,7 @@ namespace DataverseAuditManager.XrmToolBox
                 Dock = DockStyle.Top,
                 Height = 43,
                 Padding = new Padding(8, 7, 8, 5),
-                ColumnCount = 6,
+                ColumnCount = 8,
                 RowCount = 1
             };
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -77,6 +94,8 @@ namespace DataverseAuditManager.XrmToolBox
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 12));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
             var searchLabel = new Label
@@ -96,9 +115,27 @@ namespace DataverseAuditManager.XrmToolBox
             _auditedOnlyCheckBox.AutoSize = true;
             _auditedOnlyCheckBox.Anchor = AnchorStyles.Left;
 
+            var activityLabel = new Label
+            {
+                Text = "Field activity:",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left
+            };
+            _activityRangeBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _activityRangeBox.Items.AddRange(new object[]
+            {
+                "Last 7 days",
+                "Last 30 days",
+                "Last 90 days",
+                "Last 365 days"
+            });
+            _activityRangeBox.SelectedIndex = 1;
+            _activityRangeBox.Width = 105;
+            _activityRangeBox.Anchor = AnchorStyles.Left;
+
             var note = new Label
             {
-                Text = "Read-only",
+                Text = "Usage view is read-only",
                 AutoSize = true,
                 ForeColor = Color.DimGray,
                 Anchor = AnchorStyles.Left
@@ -108,7 +145,9 @@ namespace DataverseAuditManager.XrmToolBox
             panel.Controls.Add(_searchBox, 1, 0);
             panel.Controls.Add(_withUsageOnlyCheckBox, 2, 0);
             panel.Controls.Add(_auditedOnlyCheckBox, 3, 0);
-            panel.Controls.Add(note, 5, 0);
+            panel.Controls.Add(activityLabel, 5, 0);
+            panel.Controls.Add(_activityRangeBox, 6, 0);
+            panel.Controls.Add(note, 7, 0);
             return panel;
         }
 
@@ -156,25 +195,34 @@ namespace DataverseAuditManager.XrmToolBox
                 WrapContents = false
             };
 
-            var closeButton = new Button
-            {
-                Text = "Close",
-                AutoSize = true,
-                DialogResult = DialogResult.Cancel
-            };
-            var refreshButton = new Button
-            {
-                Text = "Refresh usage",
-                AutoSize = true,
-                DialogResult = DialogResult.Retry
-            };
-            ToolbarIcons.Configure(closeButton, ToolbarIcons.Close);
-            ToolbarIcons.Configure(refreshButton, ToolbarIcons.Refresh);
+            _closeButton.Text = "Close";
+            _closeButton.AutoSize = true;
+            _closeButton.DialogResult = DialogResult.Cancel;
 
-            footer.Controls.Add(closeButton);
-            footer.Controls.Add(refreshButton);
-            AcceptButton = refreshButton;
-            CancelButton = closeButton;
+            _refreshButton.Text = "Refresh usage";
+            _refreshButton.AutoSize = true;
+            _refreshButton.DialogResult = DialogResult.Retry;
+            _fieldActivityButton.Text = "Field activity...";
+            _fieldActivityButton.AutoSize = true;
+            _fieldActivityButton.Enabled = false;
+            _fieldActivityButton.Click += (_, __) => ShowFieldActivity();
+
+            _deleteHistoryButton.Text = "Delete history...";
+            _deleteHistoryButton.AutoSize = true;
+            _deleteHistoryButton.Enabled = false;
+            _deleteHistoryButton.Click += (_, __) => DeleteHistory();
+
+            ToolbarIcons.Configure(_closeButton, ToolbarIcons.Close);
+            ToolbarIcons.Configure(_refreshButton, ToolbarIcons.Refresh);
+            ToolbarIcons.Configure(_fieldActivityButton, ToolbarIcons.Usage);
+            ToolbarIcons.Configure(_deleteHistoryButton, ToolbarIcons.Delete);
+
+            footer.Controls.Add(_closeButton);
+            footer.Controls.Add(_refreshButton);
+            footer.Controls.Add(_fieldActivityButton);
+            footer.Controls.Add(_deleteHistoryButton);
+            AcceptButton = _refreshButton;
+            CancelButton = _closeButton;
             return footer;
         }
 
@@ -243,6 +291,7 @@ namespace DataverseAuditManager.XrmToolBox
 
             UpdateSortGlyph();
             _grid.ClearSelection();
+            UpdateActionState();
         }
 
         private IEnumerable<AuditStorageItem> SortTables(IEnumerable<AuditStorageItem> tables)
@@ -282,6 +331,135 @@ namespace DataverseAuditManager.XrmToolBox
             return descending
                 ? tables.OrderByDescending(keySelector, StringComparer.OrdinalIgnoreCase)
                 : tables.OrderBy(keySelector, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private AuditStorageItem SelectedTable =>
+            _grid.SelectedRows.Count == 1
+                ? _grid.SelectedRows[0].Tag as AuditStorageItem
+                : _grid.CurrentRow?.Tag as AuditStorageItem;
+
+        private int SelectedActivityDays
+        {
+            get
+            {
+                var ranges = new[] { 7, 30, 90, 365 };
+                var index = _activityRangeBox.SelectedIndex;
+                return index >= 0 && index < ranges.Length ? ranges[index] : 30;
+            }
+        }
+
+        private void UpdateActionState()
+        {
+            var selected = SelectedTable;
+            _fieldActivityButton.Enabled = selected != null;
+            _deleteHistoryButton.Enabled = selected != null && selected.SizeInBytes > 0;
+        }
+
+        private async void ShowFieldActivity()
+        {
+            var table = SelectedTable;
+            if (table == null)
+                return;
+
+            SetActivityBusy(true, $"Loading {SelectedActivityDays}-day field activity for {table.LogicalName}...");
+            try
+            {
+                IProgress<string> progress = new Progress<string>(message => _summaryLabel.Text = message);
+                var days = SelectedActivityDays;
+                var snapshot = await Task.Run(() => DataverseAuditService.LoadAuditFieldActivity(
+                    _service,
+                    table,
+                    days,
+                    (_, message) => progress.Report(message)));
+
+                _summaryLabel.Text = _summaryText;
+                using (var dialog = new AuditFieldActivityForm(snapshot))
+                    dialog.ShowDialog(this);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(
+                    this,
+                    exception.GetBaseException().Message,
+                    "Load field audit activity",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _summaryLabel.Text = _summaryText;
+                SetActivityBusy(false, null);
+            }
+        }
+
+        private async void DeleteHistory()
+        {
+            var table = SelectedTable;
+            if (table == null)
+                return;
+
+            AuditCleanupRequest cleanup;
+            using (var dialog = new AuditCleanupForm(table))
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+                cleanup = dialog.CleanupRequest;
+            }
+
+            SetActivityBusy(true, $"Submitting audit cleanup for {table.LogicalName}...");
+            try
+            {
+                var result = await Task.Run(() => DataverseAuditService.StartAuditCleanup(_service, cleanup));
+                _summaryLabel.Text = _summaryText;
+                MessageBox.Show(
+                    this,
+                    $"The audit cleanup job was submitted successfully.\n\n" +
+                    $"Job: {result.JobName}\n" +
+                    $"Job ID: {result.JobId}\n\n" +
+                    "Dataverse will run it asynchronously. Monitor Bulk deletion system jobs, " +
+                    "then refresh audit usage after it completes.",
+                    "Audit cleanup submitted",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(
+                    this,
+                    exception.GetBaseException().Message,
+                    "Submit audit cleanup",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _summaryLabel.Text = _summaryText;
+                SetActivityBusy(false, null);
+            }
+        }
+
+        private void SetActivityBusy(bool busy, string message)
+        {
+            UseWaitCursor = busy;
+            _grid.Enabled = !busy;
+            _searchBox.Enabled = !busy;
+            _withUsageOnlyCheckBox.Enabled = !busy;
+            _auditedOnlyCheckBox.Enabled = !busy;
+            _activityRangeBox.Enabled = !busy;
+            _refreshButton.Enabled = !busy;
+            _closeButton.Enabled = !busy;
+            ControlBox = !busy;
+            if (busy)
+            {
+                _fieldActivityButton.Enabled = false;
+                _deleteHistoryButton.Enabled = false;
+                if (!string.IsNullOrWhiteSpace(message))
+                    _summaryLabel.Text = message;
+            }
+            else
+            {
+                UpdateActionState();
+            }
         }
 
         private void Grid_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs eventArgs)

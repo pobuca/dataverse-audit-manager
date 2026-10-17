@@ -468,6 +468,183 @@ namespace DataverseAuditManager.XrmToolBox
             };
         }
 
+        public static AuditFieldActivitySnapshot LoadAuditFieldActivity(
+            IOrganizationService service,
+            AuditStorageItem table,
+            int days,
+            Action<int, string> reportProgress = null)
+        {
+            if (service == null)
+                throw new InvalidOperationException("The Dataverse connection is not available.");
+            if (table == null || string.IsNullOrWhiteSpace(table.LogicalName))
+                throw new ArgumentException("Select a table before loading field activity.", nameof(table));
+            if (days < 1)
+                throw new ArgumentOutOfRangeException(nameof(days));
+
+            reportProgress?.Invoke(5, $"Loading field metadata for {table.LogicalName}...");
+            var metadata = RetrieveAuditMetadata(service, table.LogicalName, includeColumns: true)
+                .SingleOrDefault(item => string.Equals(
+                    item.LogicalName,
+                    table.LogicalName,
+                    StringComparison.OrdinalIgnoreCase));
+            if (metadata == null)
+                throw new InvalidOperationException($"Table metadata was not returned for '{table.LogicalName}'.");
+
+            var fields = MapColumns(metadata)
+                .Select(column => new AuditFieldActivityItem
+                {
+                    LogicalName = column.LogicalName,
+                    DisplayName = column.DisplayName,
+                    Type = column.Type,
+                    AuditingEnabled = column.Enabled,
+                    ColumnNumber = column.ColumnNumber
+                })
+                .ToList();
+            var fieldsByNumber = fields
+                .Where(field => field.ColumnNumber.HasValue)
+                .GroupBy(field => field.ColumnNumber.Value)
+                .ToDictionary(group => group.Key, group => group.First());
+
+            var toUtc = DateTimeOffset.UtcNow;
+            var fromUtc = toUtc.AddDays(-days);
+            var query = new QueryExpression("audit")
+            {
+                ColumnSet = new ColumnSet("attributemask", "createdon"),
+                NoLock = true,
+                PageInfo = new PagingInfo { Count = 5000, PageNumber = 1 }
+            };
+            query.Criteria.AddCondition("objecttypecode", ConditionOperator.Equal, table.LogicalName);
+            query.Criteria.AddCondition("createdon", ConditionOperator.OnOrAfter, fromUtc.UtcDateTime);
+            query.Criteria.AddCondition("createdon", ConditionOperator.OnOrBefore, toUtc.UtcDateTime);
+            query.Criteria.AddCondition("attributemask", ConditionOperator.NotNull);
+            query.Orders.Add(new OrderExpression("createdon", OrderType.Descending));
+
+            const int maximumAuditRecords = 100000;
+            var scannedRecords = 0;
+            var unmappedReferences = 0;
+            var truncated = false;
+
+            while (true)
+            {
+                reportProgress?.Invoke(
+                    Math.Min(90, 15 + scannedRecords / 1500),
+                    $"Reading audit activity for {table.LogicalName}: {scannedRecords:N0} record(s)...");
+                var page = service.RetrieveMultiple(query);
+
+                foreach (var audit in page.Entities)
+                {
+                    if (scannedRecords >= maximumAuditRecords)
+                    {
+                        truncated = true;
+                        break;
+                    }
+
+                    scannedRecords++;
+                    var mask = audit.GetAttributeValue<string>("attributemask");
+                    if (string.IsNullOrWhiteSpace(mask))
+                        continue;
+
+                    var changedAt = audit.GetAttributeValue<DateTime>("createdon");
+                    var columnNumbers = new HashSet<int>();
+                    foreach (var token in mask.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        if (int.TryParse(token.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+                            columnNumbers.Add(number);
+                    }
+
+                    foreach (var columnNumber in columnNumbers)
+                    {
+                        if (!fieldsByNumber.TryGetValue(columnNumber, out var field))
+                        {
+                            unmappedReferences++;
+                            continue;
+                        }
+
+                        field.AuditEventCount++;
+                        if (!field.LastChangedUtc.HasValue || changedAt > field.LastChangedUtc.Value)
+                            field.LastChangedUtc = changedAt;
+                    }
+                }
+
+                if (truncated || !page.MoreRecords)
+                    break;
+
+                query.PageInfo.PageNumber++;
+                query.PageInfo.PagingCookie = page.PagingCookie;
+            }
+
+            foreach (var field in fields)
+            {
+                field.RecordPercentage = scannedRecords > 0
+                    ? field.AuditEventCount * 100d / scannedRecords
+                    : 0;
+            }
+
+            reportProgress?.Invoke(100, "Field audit activity loaded.");
+            return new AuditFieldActivitySnapshot
+            {
+                TableLogicalName = table.LogicalName,
+                TableDisplayName = table.DisplayName,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
+                ScannedAuditRecords = scannedRecords,
+                UnmappedFieldReferences = unmappedReferences,
+                IsTruncated = truncated,
+                Fields = fields
+                    .OrderByDescending(field => field.AuditEventCount)
+                    .ThenBy(field => field.LogicalName, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            };
+        }
+
+        public static AuditCleanupResult StartAuditCleanup(
+            IOrganizationService service,
+            AuditCleanupRequest cleanup)
+        {
+            if (service == null)
+                throw new InvalidOperationException("The Dataverse connection is not available.");
+            if (cleanup == null || string.IsNullOrWhiteSpace(cleanup.TableLogicalName))
+                throw new ArgumentException("A table is required for audit cleanup.", nameof(cleanup));
+
+            var query = new QueryExpression("audit")
+            {
+                ColumnSet = new ColumnSet(false),
+                NoLock = true
+            };
+            query.Criteria.AddCondition(
+                "objecttypecode",
+                ConditionOperator.Equal,
+                cleanup.TableLogicalName);
+            if (cleanup.CreatedBeforeUtc.HasValue)
+            {
+                query.Criteria.AddCondition(
+                    "createdon",
+                    ConditionOperator.LessThan,
+                    cleanup.CreatedBeforeUtc.Value);
+            }
+
+            var cutoffLabel = cleanup.CreatedBeforeUtc.HasValue
+                ? $" before {cleanup.CreatedBeforeUtc.Value:yyyy-MM-dd} UTC"
+                : string.Empty;
+            var jobName = $"Delete audit history for {cleanup.TableLogicalName}{cutoffLabel}";
+            var response = (BulkDeleteResponse)service.Execute(new BulkDeleteRequest
+            {
+                QuerySet = new[] { query },
+                JobName = jobName,
+                SendEmailNotification = false,
+                ToRecipients = Array.Empty<Guid>(),
+                CCRecipients = Array.Empty<Guid>(),
+                RecurrencePattern = string.Empty,
+                StartDateTime = DateTime.UtcNow
+            });
+
+            return new AuditCleanupResult
+            {
+                JobId = response.JobId,
+                JobName = jobName
+            };
+        }
+
         private static List<AuditTableItem> LoadTableMetadata(IOrganizationService service)
         {
             return RetrieveAuditMetadata(service, null, includeColumns: false)
@@ -530,7 +707,8 @@ namespace DataverseAuditManager.XrmToolBox
                     "DisplayName",
                     "AttributeType",
                     "AttributeTypeName",
-                    "IsAuditEnabled");
+                    "IsAuditEnabled",
+                    "ColumnNumber");
                 query.AttributeQuery = new AttributeQueryExpression
                 {
                     Properties = attributeProperties
@@ -563,7 +741,8 @@ namespace DataverseAuditManager.XrmToolBox
                         OriginalEnabled = column.IsAuditEnabled.Value,
                         Enabled = column.IsAuditEnabled.Value,
                         CanBeChanged = column.IsAuditEnabled.CanBeChanged && !isVirtual,
-                        IsVirtual = isVirtual
+                        IsVirtual = isVirtual,
+                        ColumnNumber = column.ColumnNumber
                     };
                 })
                 .OrderBy(column => column.LogicalName, StringComparer.OrdinalIgnoreCase)

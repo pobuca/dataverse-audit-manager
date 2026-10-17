@@ -18,7 +18,9 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Batches metadata retrievals and updates, skips no-op updates, publishes affected tables once, and verifies the effective settings afterward
 - Prevents editing settings whose managed property cannot be changed and explicitly treats virtual fields as non-auditable
 - Reverts pending changes
-- Shows read-only audit storage usage per table using Dataverse `GetAuditStorageDetails`, with search, filters, sorting, percentages, and refresh
+- Shows audit storage usage per table using Dataverse `GetAuditStorageDetails`, with search, filters, sorting, percentages, and refresh
+- Provides an on-demand, date-bounded field activity drill-down based on audit attribute masks; activity counts are clearly distinguished from storage-byte estimates
+- Can submit a separately guarded, asynchronous audit-history cleanup job for a selected table, with an optional cutoff date, typed table-name confirmation, and a final confirmation defaulting to **No**
 - Exports the complete effective configuration to JSON, loading any remaining field metadata on demand
 - Includes custom 32×32 and 80×80 XrmToolBox branding icons
 
@@ -70,7 +72,9 @@ The apply operation uses:
 
 After publishing, the plugin re-reads every changed table and field from the published metadata. Any setting Dataverse did not retain is restored to its effective value in the grid and reported as a verification warning.
 
-The **Audit usage** command is read-only. It requests the official per-table audit storage breakdown from Dataverse and may poll while the environment calculates the result.
+The **Audit usage** grid and field-activity drill-down are read-only. The storage view requests the official per-table breakdown from Dataverse and may poll while the environment calculates the result. Field activity is loaded only on request, is date-bounded, and scans at most the latest 100,000 matching audit records. It reports change activity rather than attempting to assign shared audit-record bytes to individual fields.
+
+Audit deletion is isolated in a separate workflow. The user must select a table, optionally choose a cutoff date, type the table logical name, and accept a final irreversible-operation warning that defaults to **No**. The plugin submits a Dataverse `BulkDeleteRequest`; Dataverse validates privileges and performs the deletion asynchronously. Deleted history cannot be recovered.
 
 If an operation fails partway through, refresh the grid to see the server's effective state before retrying.
 

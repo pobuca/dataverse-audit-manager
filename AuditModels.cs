@@ -56,6 +56,7 @@ namespace DataverseAuditManager.XrmToolBox
         public bool Enabled { get; set; }
         public bool CanBeChanged { get; set; }
         public bool IsVirtual { get; set; }
+        public int? ColumnNumber { get; set; }
 
         public bool IsChanged => OriginalEnabled != Enabled;
         public string Pending => IsChanged ? "●" : "";
@@ -108,6 +109,45 @@ namespace DataverseAuditManager.XrmToolBox
         public string AuditingStatus => AuditingEnabled.HasValue
             ? AuditingEnabled.Value ? "Enabled" : "Disabled"
             : "Unknown";
+    }
+
+    internal sealed class AuditFieldActivitySnapshot
+    {
+        public string TableLogicalName { get; set; }
+        public string TableDisplayName { get; set; }
+        public DateTimeOffset FromUtc { get; set; }
+        public DateTimeOffset ToUtc { get; set; }
+        public int ScannedAuditRecords { get; set; }
+        public int UnmappedFieldReferences { get; set; }
+        public bool IsTruncated { get; set; }
+        public List<AuditFieldActivityItem> Fields { get; set; } = new List<AuditFieldActivityItem>();
+    }
+
+    internal sealed class AuditFieldActivityItem
+    {
+        public string LogicalName { get; set; }
+        public string DisplayName { get; set; }
+        public string Type { get; set; }
+        public bool AuditingEnabled { get; set; }
+        public int? ColumnNumber { get; set; }
+        public int AuditEventCount { get; set; }
+        public double RecordPercentage { get; set; }
+        public DateTime? LastChangedUtc { get; set; }
+
+        public string AuditingStatus => AuditingEnabled ? "Enabled" : "Disabled";
+    }
+
+    internal sealed class AuditCleanupRequest
+    {
+        public string TableLogicalName { get; set; }
+        public string TableDisplayName { get; set; }
+        public DateTime? CreatedBeforeUtc { get; set; }
+    }
+
+    internal sealed class AuditCleanupResult
+    {
+        public Guid JobId { get; set; }
+        public string JobName { get; set; }
     }
 
     internal sealed class AuditExport

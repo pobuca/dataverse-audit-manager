@@ -9,7 +9,7 @@
     <Authors>Pobuca</Authors>
     <Description>Inspect and manage Dataverse table and column auditing from XrmToolBox.</Description>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>1.3.4</Version>
+    <Version>1.4.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

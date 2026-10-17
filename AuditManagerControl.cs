@@ -971,7 +971,7 @@ namespace DataverseAuditManager.XrmToolBox
                         $"Audit usage loaded: {usage.Tables.Count(table => table.SizeInBytes > 0)} table(s), " +
                         $"{FormatBytes(usage.TotalSizeInBytes)} total";
 
-                    using (var dialog = new AuditUsageForm(usage))
+                    using (var dialog = new AuditUsageForm(usage, Service))
                     {
                         if (dialog.ShowDialog(this) == DialogResult.Retry)
                             BeginInvoke(new Action(() => ExecuteMethod(LoadAuditUsage)));

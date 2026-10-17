@@ -21,6 +21,7 @@ namespace DataverseAuditManager.XrmToolBox
         public static Image Review { get; } = DrawReview();
         public static Image Usage { get; } = DrawUsage();
         public static Image Export { get; } = DrawExport();
+        public static Image Delete { get; } = DrawDelete();
         public static Image Close { get; } = DrawClose();
 
         public static void Configure(Button button, Image image)
@@ -186,6 +187,21 @@ namespace DataverseAuditManager.XrmToolBox
                 {
                     graphics.DrawLine(pen, 5.2f, 6, 10.8f, 6);
                     graphics.DrawLine(pen, 5.2f, 9, 9.8f, 9);
+                }
+            });
+        }
+
+        private static Image DrawDelete()
+        {
+            return CreateBitmap(graphics =>
+            {
+                using (var pen = CreatePen(Magenta, 1.7f))
+                {
+                    graphics.DrawLine(pen, 5, 6, 15, 6);
+                    graphics.DrawLine(pen, 8, 3.5f, 12, 3.5f);
+                    graphics.DrawRectangle(pen, 6, 7, 8, 10);
+                    graphics.DrawLine(pen, 9, 9, 9, 15);
+                    graphics.DrawLine(pen, 11, 9, 11, 15);
                 }
             });
         }
