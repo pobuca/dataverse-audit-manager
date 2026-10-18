@@ -87,13 +87,18 @@ namespace DataverseAuditManager.XrmToolBox
         {
             return CreateBitmap(graphics =>
             {
-                using (var pen = CreatePen(Teal, 1.8f))
-                    graphics.DrawEllipse(pen, 2.5f, 2.5f, 15, 15);
-                using (var pen = CreatePen(Blue, 2.0f))
+                using (var track = CreateRoundedRectangle(new RectangleF(1.5f, 5, 17, 10), 5))
+                using (var brush = new SolidBrush(Teal))
+                using (var pen = CreatePen(Blue, 1.2f))
                 {
-                    graphics.DrawLine(pen, 10, 6, 10, 14);
-                    graphics.DrawLine(pen, 6, 10, 14, 10);
+                    graphics.FillPath(brush, track);
+                    graphics.DrawPath(pen, track);
                 }
+
+                using (var brush = new SolidBrush(Color.White))
+                    graphics.FillEllipse(brush, 10.2f, 6.2f, 7.6f, 7.6f);
+                using (var pen = CreatePen(Blue, 1.0f))
+                    graphics.DrawEllipse(pen, 10.2f, 6.2f, 7.6f, 7.6f);
             });
         }
 
@@ -101,10 +106,12 @@ namespace DataverseAuditManager.XrmToolBox
         {
             return CreateBitmap(graphics =>
             {
-                using (var pen = CreatePen(Magenta, 1.8f))
-                    graphics.DrawEllipse(pen, 2.5f, 2.5f, 15, 15);
-                using (var pen = CreatePen(Magenta, 2.0f))
-                    graphics.DrawLine(pen, 6, 10, 14, 10);
+                using (var track = CreateRoundedRectangle(new RectangleF(1.5f, 5, 17, 10), 5))
+                using (var pen = CreatePen(Magenta, 1.7f))
+                    graphics.DrawPath(pen, track);
+
+                using (var brush = new SolidBrush(Magenta))
+                    graphics.FillEllipse(brush, 2.2f, 6.2f, 7.6f, 7.6f);
             });
         }
 
@@ -216,6 +223,18 @@ namespace DataverseAuditManager.XrmToolBox
                     graphics.DrawLine(pen, 15.5f, 4.5f, 4.5f, 15.5f);
                 }
             });
+        }
+
+        private static GraphicsPath CreateRoundedRectangle(RectangleF bounds, float radius)
+        {
+            var diameter = radius * 2;
+            var path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
         }
 
         private static Pen CreatePen(Color color, float width)
