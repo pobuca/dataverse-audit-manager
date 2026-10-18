@@ -161,7 +161,7 @@ namespace DataverseAuditManager.XrmToolBox
             tableActions.Controls.Add(_enableAllTablesButton, 3, 0);
             tableActions.Controls.Add(_disableAllTablesButton, 4, 0);
 
-            var tableTitle = CreateSectionTitle("Tables");
+            var tableTitle = CreateSectionTitle("Tables", Color.FromArgb(34, 193, 197));
             split.Panel1.Controls.Add(_tableGrid);
             split.Panel1.Controls.Add(tableActions);
             split.Panel1.Controls.Add(tableTitle);
@@ -199,7 +199,7 @@ namespace DataverseAuditManager.XrmToolBox
             columnActions.Controls.Add(_enableAllColumnsButton, 3, 0);
             columnActions.Controls.Add(_disableAllColumnsButton, 4, 0);
 
-            var columnTitle = CreateSectionTitle("Columns for selected table");
+            var columnTitle = CreateSectionTitle("Columns for selected table", Color.FromArgb(198, 67, 202));
             split.Panel2.Controls.Add(_columnGrid);
             split.Panel2.Controls.Add(columnActions);
             split.Panel2.Controls.Add(columnTitle);
@@ -243,18 +243,32 @@ namespace DataverseAuditManager.XrmToolBox
             button.ImageAlign = ContentAlignment.MiddleCenter;
         }
 
-        private static Label CreateSectionTitle(string text)
+        private static Control CreateSectionTitle(string text, Color accentColor)
         {
-            return new Label
+            var panel = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 30,
+                BackColor = Color.FromArgb(0, 107, 253)
+            };
+            var title = new Label
+            {
+                Dock = DockStyle.Fill,
                 Text = text,
                 Font = new Font(SystemFonts.MessageBoxFont, FontStyle.Bold),
-                BackColor = Color.FromArgb(31, 78, 120),
                 ForeColor = Color.White,
-                Padding = new Padding(8, 7, 0, 0)
+                Padding = new Padding(9, 7, 0, 0)
             };
+            var accent = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 6,
+                BackColor = accentColor
+            };
+
+            panel.Controls.Add(title);
+            panel.Controls.Add(accent);
+            return panel;
         }
 
         private void ConfigureTableGrid()
