@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/pobuca-icon-512.png" alt="Pobuca" width="96" />
+  <img src="https://raw.githubusercontent.com/pobuca/dataverse-audit-manager/main/assets/pobuca-icon-512.png" alt="Pobuca" width="96" />
 </p>
 
 # Dataverse Audit Manager for XrmToolBox
@@ -13,14 +13,14 @@ The plugin uses the active XrmToolBox connection. It does not store connection s
 
 ## Screenshots
 
-![Dataverse Audit Manager table and column auditing](docs/images/overview.png)
+![Dataverse Audit Manager table and column auditing](https://raw.githubusercontent.com/pobuca/dataverse-audit-manager/main/docs/images/overview.png)
 
 <details>
 <summary>Audit storage and field activity</summary>
 
-![Audit storage by table](docs/images/audit-usage.png)
+![Audit storage by table](https://raw.githubusercontent.com/pobuca/dataverse-audit-manager/main/docs/images/audit-usage.png)
 
-![Field audit activity](docs/images/field-activity.png)
+![Field audit activity](https://raw.githubusercontent.com/pobuca/dataverse-audit-manager/main/docs/images/field-activity.png)
 
 </details>
 
@@ -127,7 +127,7 @@ Create and validate a release package locally with:
 .\Pack.ps1
 ```
 
-Packages are written under `artifacts`. Tagging an exact project version such as `v1.4.3` triggers the GitHub Release workflow, which uses NuGet Trusted Publishing with GitHub OIDC rather than a stored API key. See [RELEASING.md](RELEASING.md) for NuGet.org and XrmToolBox Tool Library publication steps.
+Packages are written under `artifacts`. Tagging an exact project version such as `v1.4.4` triggers the GitHub Release workflow, which uses NuGet Trusted Publishing with GitHub OIDC rather than a stored API key. See [RELEASING.md](RELEASING.md) for NuGet.org and XrmToolBox Tool Library publication steps.
 
 ## Logo assets
 

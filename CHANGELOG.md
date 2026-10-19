@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented here.
 
+## [1.4.4] - 2026-10-19
+
+- Improved logo compatibility with XrmToolBox Tool Library validation.
+- Changed documentation images to absolute URLs so they render on NuGet.org.
+
 ## [1.4.3] - 2026-10-19
 
 - Replaced the custom plugin artwork with the original Pobuca icon.

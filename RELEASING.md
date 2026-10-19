@@ -46,8 +46,8 @@ lib/net48/Plugins/DataverseAuditManager.XrmToolBox.dll
 7. Tag the exact project version and push the tag:
 
 ```powershell
-git tag -a v1.4.3 -m "Dataverse Audit Manager 1.4.3"
-git push origin v1.4.3
+git tag -a v1.4.4 -m "Dataverse Audit Manager 1.4.4"
+git push origin v1.4.4
 ```
 
 The Release workflow validates that the tag and project version match, builds and packages the plugin, authenticates to NuGet.org through Trusted Publishing, publishes the package, and creates a GitHub release containing the `.nupkg` and plugin DLL.

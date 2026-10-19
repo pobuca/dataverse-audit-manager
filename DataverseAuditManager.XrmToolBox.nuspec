@@ -2,20 +2,19 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>Pobuca.DataverseAuditManager.XrmToolBox</id>
-    <version>1.4.3</version>
+    <version>1.4.4</version>
     <title>Dataverse Audit Manager for XrmToolBox</title>
     <authors>KostasSavvopoulos</authors>
     <owners>Pobuca</owners>
     <license type="expression">MIT</license>
     <projectUrl>https://github.com/pobuca/dataverse-audit-manager</projectUrl>
-    <icon>icon.png</icon>
     <iconUrl>https://raw.githubusercontent.com/pobuca/dataverse-audit-manager/main/assets/audit-manager-logo-512.png</iconUrl>
     <readme>README.md</readme>
     <repository type="git" url="https://github.com/pobuca/dataverse-audit-manager.git" />
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <summary>Inspect, configure, and manage Microsoft Dataverse auditing from XrmToolBox.</summary>
     <description>Dataverse Audit Manager is an XrmToolBox plugin for inspecting and managing environment, table, and column auditing. It stages configuration changes before publishing, verifies effective settings, reports audit storage by table, provides field-activity drill-downs, and offers a separately guarded asynchronous audit-history cleanup workflow.</description>
-    <releaseNotes>Version 1.4.3 uses the original Pobuca plugin icon and includes table and column audit configuration, staged review and publish, audit storage reporting, field activity drill-downs, and guarded audit cleanup.</releaseNotes>
+    <releaseNotes>Version 1.4.4 improves XrmToolBox Tool Library logo compatibility and fixes image links in the NuGet package documentation.</releaseNotes>
     <copyright>Copyright 2026 Pobuca</copyright>
     <tags>XrmToolBox Plugins Dataverse PowerPlatform Dynamics365 Audit Auditing Administration</tags>
     <dependencies>
