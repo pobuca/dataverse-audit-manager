@@ -127,7 +127,7 @@ Create and validate a release package locally with:
 .\Pack.ps1
 ```
 
-Packages are written under `artifacts`. Tagging an exact project version such as `v1.4.3` triggers the GitHub Release workflow. See [RELEASING.md](RELEASING.md) for NuGet.org and XrmToolBox Tool Library publication steps.
+Packages are written under `artifacts`. Tagging an exact project version such as `v1.4.3` triggers the GitHub Release workflow, which uses NuGet Trusted Publishing with GitHub OIDC rather than a stored API key. See [RELEASING.md](RELEASING.md) for NuGet.org and XrmToolBox Tool Library publication steps.
 
 ## Logo assets
 

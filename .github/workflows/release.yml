@@ -7,13 +7,12 @@ on:
 
 permissions:
   contents: write
-
-env:
-  NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+  id-token: write
 
 jobs:
   release:
     runs-on: windows-latest
+    environment: release
 
     steps:
       - name: Check out repository
@@ -56,16 +55,20 @@ jobs:
             bin/Release/net48/DataverseAuditManager.XrmToolBox.dll
           if-no-files-found: error
 
+      - name: Sign in to NuGet.org with OIDC
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Publish to NuGet.org
-        if: ${{ env.NUGET_API_KEY != '' }}
         shell: pwsh
         run: |
           $package = (Get-ChildItem ./artifacts/*.nupkg -File | Select-Object -First 1).FullName
-          nuget push $package `
-            -ApiKey $env:NUGET_API_KEY `
-            -Source https://api.nuget.org/v3/index.json `
-            -SkipDuplicate `
-            -NonInteractive
+          dotnet nuget push $package `
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" `
+            --source https://api.nuget.org/v3/index.json `
+            --skip-duplicate
 
       - name: Create GitHub release
         shell: pwsh

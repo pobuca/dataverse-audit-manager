@@ -4,12 +4,22 @@ The public package ID is `Pobuca.DataverseAuditManager.XrmToolBox`.
 
 ## One-time repository setup
 
-1. Create a NuGet.org account and confirm ownership details.
-2. Create a NuGet API key scoped to `Pobuca.DataverseAuditManager.XrmToolBox` (or initially to new packages).
-3. In GitHub, open **Settings → Secrets and variables → Actions**.
-4. Add the API key as the repository secret `NUGET_API_KEY`.
+Publishing uses [NuGet Trusted Publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing) and GitHub OIDC. Do not create or store a long-lived NuGet API key.
+
+1. Sign in to NuGet.org and confirm the account or organization that should own the package.
+2. Open the NuGet.org **Trusted Publishing** page from the account menu and add a GitHub policy with:
+   - **Repository owner:** `pobuca`
+   - **Repository:** `dataverse-audit-manager`
+   - **Workflow file:** `release.yml` (file name only)
+   - **Environment:** `release`
+   - **Package scope/glob:** `Pobuca.DataverseAuditManager.XrmToolBox`
+   - Allow publishing new packages and new package versions.
+3. In GitHub, open **Settings → Environments**, create the `release` environment, and optionally require a reviewer before deployments.
+4. Add an environment secret named `NUGET_USER` containing the NuGet.org profile username associated with the policy. Use the profile name, not an email address.
 5. Enable private vulnerability reporting under **Settings → Security → Code security and analysis**.
 6. After the Build workflow has succeeded, protect `main` with a ruleset requiring pull requests and the `build` status check.
+
+The Release workflow requests a one-time GitHub OIDC token. `NuGet/login@v1` exchanges it for a short-lived NuGet credential immediately before publication. No NuGet publishing credential is stored in GitHub.
 
 ## Validate a package locally
 
@@ -40,7 +50,7 @@ git tag -a v1.4.3 -m "Dataverse Audit Manager 1.4.3"
 git push origin v1.4.3
 ```
 
-The Release workflow validates that the tag and project version match, builds and packages the plugin, publishes to NuGet.org when `NUGET_API_KEY` is configured, and creates a GitHub release containing the `.nupkg` and plugin DLL.
+The Release workflow validates that the tag and project version match, builds and packages the plugin, authenticates to NuGet.org through Trusted Publishing, publishes the package, and creates a GitHub release containing the `.nupkg` and plugin DLL.
 
 NuGet package versions are immutable. Never reuse or overwrite a published version.
 
