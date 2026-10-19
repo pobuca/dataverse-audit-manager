@@ -22,7 +22,7 @@ An XrmToolBox plugin for viewing and changing Dataverse auditing at table and co
 - Provides an on-demand, date-bounded field activity drill-down based on audit attribute masks; activity counts are clearly distinguished from storage-byte estimates
 - Can submit a separately guarded, asynchronous audit-history cleanup job for a selected table, with an optional cutoff date, typed table-name confirmation, and a final confirmation defaulting to **No**
 - Exports the complete effective configuration to JSON, loading any remaining field metadata on demand
-- Includes custom 32×32 and 80×80 XrmToolBox branding icons
+- Uses the original Pobuca icon in the 32×32 and 80×80 XrmToolBox branding assets
 
 ## Build
 
@@ -82,6 +82,8 @@ If an operation fails partway through, refresh the grid to see the server's effe
 
 Logo source and generated icons are under `assets`:
 
+- `pobuca-icon.svg`
+- `pobuca-icon-512.png`
 - `audit-manager-logo-512.png`
 - `audit-manager-logo-80.png`
 - `audit-manager-logo-32.png`
