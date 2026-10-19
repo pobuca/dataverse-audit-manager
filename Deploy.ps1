@@ -1,5 +1,5 @@
 param(
-    [string]$XrmToolBoxPath = "$env:USERPROFILE\Documents\XrmToolbox v1.2026.8.75"
+    [string]$XrmToolBoxPath = "$env:USERPROFILE\Documents\XrmToolbox v1.2026.9.78"
 )
 
 $ErrorActionPreference = "Stop"
