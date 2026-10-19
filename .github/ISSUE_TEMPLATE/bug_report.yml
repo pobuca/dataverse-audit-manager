@@ -1,0 +1,61 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, environment URLs, customer records, audit exports, or other sensitive data.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      placeholder: 1.4.3
+    validations:
+      required: true
+  - type: input
+    id: xrmtoolbox
+    attributes:
+      label: XrmToolBox version
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment type
+      options:
+        - Development
+        - Test / sandbox
+        - Production
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open...
+        2. Select...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Add sanitized errors, logs, or screenshots. Remove tenant, user, record, and customer information.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed credentials and customer/environment data from this report.
+          required: true
