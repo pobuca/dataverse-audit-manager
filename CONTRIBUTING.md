@@ -22,8 +22,8 @@ Requirements:
 Build the project:
 
 ```powershell
-dotnet restore --configfile NuGet.Config
-dotnet build DataverseAuditManager.slnx --configuration Release --no-restore
+dotnet restore DataverseAuditManager.XrmToolBox.csproj --configfile NuGet.Config
+dotnet build DataverseAuditManager.XrmToolBox.csproj --configuration Release --no-restore
 ```
 
 Install the local build after closing XrmToolBox:

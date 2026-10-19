@@ -91,8 +91,8 @@ If an operation fails partway through, refresh the relevant view to obtain the s
 The plugin targets .NET Framework 4.8.
 
 ```powershell
-dotnet restore --configfile NuGet.Config
-dotnet build DataverseAuditManager.slnx --configuration Release --no-restore
+dotnet restore DataverseAuditManager.XrmToolBox.csproj --configfile NuGet.Config
+dotnet build DataverseAuditManager.XrmToolBox.csproj --configuration Release --no-restore
 ```
 
 Output:
@@ -113,6 +113,22 @@ Local installations are categorized as **Configuration**, **Data**, and **Securi
 .\Set-PluginCategories.ps1
 ```
 
+## Package and release
+
+The NuGet package ID is:
+
+```text
+Pobuca.DataverseAuditManager.XrmToolBox
+```
+
+Create and validate a release package locally with:
+
+```powershell
+.\Pack.ps1
+```
+
+Packages are written under `artifacts`. Tagging an exact project version such as `v1.4.3` triggers the GitHub Release workflow. See [RELEASING.md](RELEASING.md) for NuGet.org and XrmToolBox Tool Library publication steps.
+
 ## Logo assets
 
 Logo source and generated icons are under `assets`:
@@ -131,6 +147,7 @@ Run `python assets/generate_logo.py` to regenerate the plugin PNG files and embe
 - Use GitHub issues for sanitized bug reports and feature requests.
 - Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 - See [CHANGELOG.md](CHANGELOG.md) for release history.
+- See [RELEASING.md](RELEASING.md) for packaging and publication.
 
 Never publish credentials, access tokens, environment URLs, customer records, or audit exports in an issue.
 

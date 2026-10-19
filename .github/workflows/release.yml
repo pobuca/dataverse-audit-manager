@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up NuGet CLI
+        uses: NuGet/setup-nuget@v2
+
+      - name: Validate release tag
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content ./DataverseAuditManager.XrmToolBox.csproj
+          $version = [string]$project.Project.PropertyGroup.Version
+          $expectedTag = "v$version"
+          if ($env:GITHUB_REF_NAME -ne $expectedTag) {
+            throw "Tag '$env:GITHUB_REF_NAME' must match project version '$expectedTag'."
+          }
+
+      - name: Restore
+        run: dotnet restore DataverseAuditManager.XrmToolBox.csproj --configfile NuGet.Config
+
+      - name: Build
+        run: dotnet build DataverseAuditManager.XrmToolBox.csproj --configuration Release --no-restore
+
+      - name: Pack and validate
+        shell: pwsh
+        run: ./Pack.ps1 -Version $env:GITHUB_REF_NAME -NoBuild
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataverse-audit-manager-${{ github.ref_name }}
+          path: |
+            artifacts/*.nupkg
+            bin/Release/net48/DataverseAuditManager.XrmToolBox.dll
+          if-no-files-found: error
+
+      - name: Publish to NuGet.org
+        if: ${{ env.NUGET_API_KEY != '' }}
+        shell: pwsh
+        run: |
+          $package = (Get-ChildItem ./artifacts/*.nupkg -File | Select-Object -First 1).FullName
+          nuget push $package `
+            -ApiKey $env:NUGET_API_KEY `
+            -Source https://api.nuget.org/v3/index.json `
+            -SkipDuplicate `
+            -NonInteractive
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $package = (Get-ChildItem ./artifacts/*.nupkg -File | Select-Object -First 1).FullName
+          $dll = (Resolve-Path ./bin/Release/net48/DataverseAuditManager.XrmToolBox.dll).Path
+          gh release create $env:GITHUB_REF_NAME $package $dll `
+            --title "Dataverse Audit Manager $env:GITHUB_REF_NAME" `
+            --generate-notes

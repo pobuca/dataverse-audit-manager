@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [1.4.3] - 2026-10-19
 
 - Replaced the custom plugin artwork with the original Pobuca icon.
+- Added public NuGet packaging and automated GitHub build/release workflows.
 
 ## [1.4.2] - 2026-10-18
 

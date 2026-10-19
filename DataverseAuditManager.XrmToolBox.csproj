@@ -7,7 +7,13 @@
     <AssemblyName>DataverseAuditManager.XrmToolBox</AssemblyName>
     <RootNamespace>DataverseAuditManager.XrmToolBox</RootNamespace>
     <Authors>KostasSavvopoulos</Authors>
+    <Company>Pobuca</Company>
+    <Copyright>Copyright 2026 Pobuca</Copyright>
     <Description>Inspect and manage Dataverse table and column auditing from XrmToolBox.</Description>
+    <PackageId>Pobuca.DataverseAuditManager.XrmToolBox</PackageId>
+    <PackageProjectUrl>https://github.com/pobuca/dataverse-audit-manager</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/pobuca/dataverse-audit-manager.git</RepositoryUrl>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Version>1.4.3</Version>
   </PropertyGroup>
